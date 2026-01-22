@@ -257,9 +257,9 @@ function CoverPage() {
 function TitlePage({ title, author, date }: { title: string; author: string; date: string }) {
   const titleLines = title.split('\n');
   return (
-    <div className="relative w-full aspect-[16/9] bg-white flex">
+    <div className="relative w-full aspect-[16/9] bg-white flex title-page">
       {/* Left side - Title */}
-      <div className="w-[46%] flex flex-col justify-center px-16">
+      <div className="w-[46%] flex flex-col justify-center px-16 title-left">
         <div className="mb-6">
           <div className="w-16 h-1 bg-[#F96302] mb-6"></div>
           <h1 className="text-4xl font-normal leading-tight mb-2">
@@ -281,7 +281,7 @@ function TitlePage({ title, author, date }: { title: string; author: string; dat
       </div>
       
       {/* Right side - Orange background */}
-      <div className="w-[54%] bg-[#F96302]"></div>
+      <div className="w-[54%] bg-[#F96302] title-right"></div>
       
       {/* Home Depot Logo - bottom right */}
       <div className="absolute bottom-4 right-4">
@@ -1577,6 +1577,13 @@ export function ExportReport({
           .export-page:last-child {
             break-after: auto;
             page-break-after: auto;
+          }
+          .title-page .title-left {
+            width: 52% !important;
+            padding-right: 2rem !important;
+          }
+          .title-page .title-right {
+            width: 48% !important;
           }
         }
       `}</style>
