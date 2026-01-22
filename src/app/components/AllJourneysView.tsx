@@ -15,6 +15,8 @@ interface AllJourneysViewProps {
   onNavigateAllApps?: () => void;
   onNavigateKeyJourneys?: () => void;
   onNavigateTopPains?: () => void;
+  onNavigateAdmin?: () => void;
+  onNavigateExport?: () => void;
 }
 
 export function AllJourneysView({
@@ -26,6 +28,8 @@ export function AllJourneysView({
   onNavigateAllApps,
   onNavigateKeyJourneys,
   onNavigateTopPains,
+  onNavigateAdmin,
+  onNavigateExport,
 }: AllJourneysViewProps) {
   return (
     <div className="min-h-screen bg-white">
@@ -36,6 +40,8 @@ export function AllJourneysView({
         onNavigateAllApps={onNavigateAllApps || onNavigateBack}
         onNavigateKeyJourneys={onNavigateKeyJourneys || (() => {})}
         onNavigateTopPains={onNavigateTopPains || onNavigateBack}
+        onNavigateAdmin={onNavigateAdmin}
+        onNavigateExport={onNavigateExport}
         title="All Journeys"
         subtitle="End-to-end journey performance"
         showExportButton={true}

@@ -16,6 +16,8 @@ interface TopPainsProps {
   onNavigateAllApps?: () => void;
   onNavigateKeyJourneys?: () => void;
   onNavigateTopPains?: () => void;
+  onNavigateAdmin?: () => void;
+  onNavigateExport?: () => void;
 }
 
 interface PainPoint {
@@ -587,7 +589,17 @@ const getSeverityColor = (severity: 'high' | 'medium' | 'low') => {
   return { bg: 'bg-yellow-50', border: 'border-yellow-200', text: 'text-yellow-900', badge: 'bg-yellow-100 text-yellow-800 border-yellow-300' };
 };
 
-export function TopPains({ timePeriod, onTimePeriodChange, onNavigateBack, onNavigateHome, onNavigateAllApps, onNavigateKeyJourneys, onNavigateTopPains }: TopPainsProps) {
+export function TopPains({
+  timePeriod,
+  onTimePeriodChange,
+  onNavigateBack,
+  onNavigateHome,
+  onNavigateAllApps,
+  onNavigateKeyJourneys,
+  onNavigateTopPains,
+  onNavigateAdmin,
+  onNavigateExport,
+}: TopPainsProps) {
   const [scopeFilter, setScopeFilter] = useState<string>('all');
   const [visualizationView, setVisualizationView] = useState<'both' | 'ranking' | 'trends'>('both');
   const [selectedPainForDetail, setSelectedPainForDetail] = useState<PainPoint | null>(null);
@@ -936,6 +948,8 @@ export function TopPains({ timePeriod, onTimePeriodChange, onNavigateBack, onNav
         onNavigateAllApps={onNavigateAllApps || onNavigateBack}
         onNavigateKeyJourneys={onNavigateKeyJourneys || onNavigateBack}
         onNavigateTopPains={onNavigateTopPains || (() => {})}
+        onNavigateAdmin={onNavigateAdmin}
+        onNavigateExport={onNavigateExport}
         title="Top Pains"
         subtitle="Recurring pain points across applications"
         showExportButton={true}

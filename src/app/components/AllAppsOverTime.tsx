@@ -11,6 +11,8 @@ interface AllAppsOverTimeProps {
   onNavigateAllApps?: () => void;
   onNavigateKeyJourneys?: () => void;
   onNavigateTopPains?: () => void;
+  onNavigateAdmin?: () => void;
+  onNavigateExport?: () => void;
 }
 
 type ViewGranularity = 'monthly' | 'quarterly';
@@ -62,6 +64,8 @@ export function AllAppsOverTime({
   onNavigateAllApps,
   onNavigateKeyJourneys,
   onNavigateTopPains,
+  onNavigateAdmin,
+  onNavigateExport,
 }: AllAppsOverTimeProps) {
   const [selectedYear, setSelectedYear] = useState<string>('2025');
   const [granularity, setGranularity] = useState<ViewGranularity>('monthly');
@@ -256,6 +260,8 @@ export function AllAppsOverTime({
         onNavigateAllApps={onNavigateAllApps || (() => {})}
         onNavigateKeyJourneys={onNavigateKeyJourneys || onNavigateBack}
         onNavigateTopPains={onNavigateTopPains || onNavigateBack}
+        onNavigateAdmin={onNavigateAdmin}
+        onNavigateExport={onNavigateExport}
         title={`All Apps - ${selectedYear} Year to Date`}
         subtitle="UX-Lite scores and metrics across time periods"
         showExportButton={true}

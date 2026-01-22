@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { PortfolioOverview } from './components/PortfolioOverview';
 import { AppDetail } from './components/AppDetail';
 import { AppDetailEnhanced } from './components/AppDetailEnhanced';
@@ -9,9 +9,32 @@ import { AllJourneysView } from './components/AllJourneysView';
 import { TimeSeriesView } from './components/TimeSeriesView';
 import { AllAppsTimeGrid } from './components/AllAppsTimeGrid';
 import { TopPains } from './components/TopPains';
+import { AdminThemesView } from './components/AdminThemesView';
+import { ManageThemes } from './components/ManageThemes';
+import { ManageJourneys } from './components/ManageJourneys';
+import { ManageApps } from './components/ManageApps';
+import { ManageSettings } from './components/ManageSettings';
+import { ExportReport } from './components/ExportReport';
 import type { TimePeriodData } from './components/TimeSelector';
 
-export type ViewType = 'portfolio' | 'app-detail' | 'app-detail-enhanced' | 'journey-detail' | 'journey-detail-enhanced' | 'all-apps' | 'all-journeys' | 'time-series' | 'apps-time-grid-executive' | 'apps-time-grid-practitioner' | 'top-pains';
+export type ViewType =
+  | 'portfolio'
+  | 'app-detail'
+  | 'app-detail-enhanced'
+  | 'journey-detail'
+  | 'journey-detail-enhanced'
+  | 'all-apps'
+  | 'all-journeys'
+  | 'time-series'
+  | 'apps-time-grid-executive'
+  | 'apps-time-grid-practitioner'
+  | 'top-pains'
+  | 'admin-themes'
+  | 'admin-manage-themes'
+  | 'admin-manage-journeys'
+  | 'admin-manage-apps'
+  | 'admin-settings'
+  | 'export-report';
 export type TimePeriod = 'November 2025' | 'October 2025' | 'Q4 2025' | 'Q3 2025' | '2025' | '2024';
 
 export interface AppData {
@@ -24,11 +47,14 @@ export interface AppData {
   responses: number;
   trend: 'up' | 'down' | 'stable';
   metricsSystem: 'pendo' | 'medallia';
+  isKTLO?: boolean;
+  noUX?: boolean;
 }
 
 export interface JourneyData {
   id: string;
   name: string;
+  description?: string;
   overallScore: number;
   touchpoints: number;
   appsInvolved: number;
@@ -109,6 +135,74 @@ function App() {
     setSelectedJourney(null);
   };
 
+  const navigateToAdminThemes = () => {
+    pushToHistory('admin-themes', null, null);
+    setCurrentView('admin-themes');
+    setSelectedApp(null);
+    setSelectedJourney(null);
+  };
+
+  const navigateToManageThemes = () => {
+    pushToHistory('admin-manage-themes', null, null);
+    setCurrentView('admin-manage-themes');
+    setSelectedApp(null);
+    setSelectedJourney(null);
+  };
+
+  const navigateToManageJourneys = () => {
+    pushToHistory('admin-manage-journeys', null, null);
+    setCurrentView('admin-manage-journeys');
+    setSelectedApp(null);
+    setSelectedJourney(null);
+  };
+
+  const navigateToManageApps = () => {
+    pushToHistory('admin-manage-apps', null, null);
+    setCurrentView('admin-manage-apps');
+    setSelectedApp(null);
+    setSelectedJourney(null);
+  };
+
+  const navigateToManageSettings = () => {
+    pushToHistory('admin-settings', null, null);
+    setCurrentView('admin-settings');
+    setSelectedApp(null);
+    setSelectedJourney(null);
+  };
+
+  const navigateToExport = () => {
+    pushToHistory('export-report', null, null);
+    setCurrentView('export-report');
+    setSelectedApp(null);
+    setSelectedJourney(null);
+  };
+  const handleAdminTabChange = (tab: 'submit' | 'manage-themes' | 'manage-journeys' | 'manage-apps' | 'settings') => {
+    if (tab === 'submit') {
+      navigateToAdminThemes();
+    } else if (tab === 'manage-themes') {
+      navigateToManageThemes();
+    } else if (tab === 'manage-journeys') {
+      navigateToManageJourneys();
+    } else if (tab === 'manage-apps') {
+      navigateToManageApps();
+    } else if (tab === 'settings') {
+      navigateToManageSettings();
+    }
+  };
+
+  const getLegacyFormat = (period: TimePeriodData['period']): TimePeriodData['format'] => {
+    if (/^Q[1-4]\b/i.test(period)) return 'quarter';
+    if (/^\d{4}$/.test(period)) return 'year';
+    return 'month';
+  };
+
+  const legacyTimePeriod = timePeriod.period as TimePeriod;
+
+  const handleLegacyTimePeriodChange = (period: TimePeriod) => {
+    setTimePeriod({ format: getLegacyFormat(period), period });
+  };
+
+
   const navigateBack = () => {
     if (navigationHistory.length > 1) {
       // Remove current state
@@ -137,13 +231,15 @@ function App() {
           onNavigateToApp={navigateToAppDetail}
           onNavigateToJourney={navigateToJourneyDetail}
           onNavigateToView={navigateToView}
+          onNavigateAdmin={navigateToAdminThemes}
+          onNavigateExport={navigateToExport}
         />
       )}
       {currentView === 'app-detail' && selectedApp && (
         <AppDetail
           appId={selectedApp}
-          timePeriod={timePeriod}
-          onTimePeriodChange={setTimePeriod}
+          timePeriod={legacyTimePeriod}
+          onTimePeriodChange={handleLegacyTimePeriodChange}
           onNavigateBack={navigateBack}
         />
       )}
@@ -157,13 +253,15 @@ function App() {
           onNavigateAllApps={navigateToAllApps}
           onNavigateKeyJourneys={navigateToAllJourneys}
           onNavigateTopPains={navigateToTopPains}
+          onNavigateAdmin={navigateToAdminThemes}
+          onNavigateExport={navigateToExport}
         />
       )}
       {currentView === 'journey-detail' && selectedJourney && (
         <JourneyDetail
           journeyId={selectedJourney}
-          timePeriod={timePeriod}
-          onTimePeriodChange={setTimePeriod}
+          timePeriod={legacyTimePeriod}
+          onTimePeriodChange={handleLegacyTimePeriodChange}
           onNavigateBack={navigateBack}
         />
       )}
@@ -178,6 +276,8 @@ function App() {
           onNavigateAllApps={navigateToAllApps}
           onNavigateKeyJourneys={navigateToAllJourneys}
           onNavigateTopPains={navigateToTopPains}
+          onNavigateAdmin={navigateToAdminThemes}
+          onNavigateExport={navigateToExport}
         />
       )}
       {currentView === 'all-apps' && (
@@ -188,6 +288,8 @@ function App() {
           onNavigateAllApps={navigateToAllApps}
           onNavigateKeyJourneys={navigateToAllJourneys}
           onNavigateTopPains={navigateToTopPains}
+          onNavigateAdmin={navigateToAdminThemes}
+          onNavigateExport={navigateToExport}
         />
       )}
       {currentView === 'all-journeys' && (
@@ -200,12 +302,14 @@ function App() {
           onNavigateAllApps={navigateToAllApps}
           onNavigateKeyJourneys={navigateToAllJourneys}
           onNavigateTopPains={navigateToTopPains}
+          onNavigateAdmin={navigateToAdminThemes}
+          onNavigateExport={navigateToExport}
         />
       )}
       {currentView === 'time-series' && (
         <TimeSeriesView
-          timePeriod={timePeriod}
-          onTimePeriodChange={setTimePeriod}
+          timePeriod={legacyTimePeriod}
+          onTimePeriodChange={handleLegacyTimePeriodChange}
           onNavigateBack={navigateBack}
         />
       )}
@@ -236,6 +340,68 @@ function App() {
           onNavigateAllApps={navigateToAllApps}
           onNavigateKeyJourneys={navigateToAllJourneys}
           onNavigateTopPains={navigateToTopPains}
+          onNavigateAdmin={navigateToAdminThemes}
+          onNavigateExport={navigateToExport}
+        />
+      )}
+      {currentView === 'admin-themes' && (
+        <AdminThemesView
+          onNavigateBack={navigateBack}
+          onNavigateHome={navigateToPortfolio}
+          onNavigateAllApps={navigateToAllApps}
+          onNavigateKeyJourneys={navigateToAllJourneys}
+          onNavigateTopPains={navigateToTopPains}
+          onTabChange={handleAdminTabChange}
+        />
+      )}
+      {currentView === 'admin-manage-themes' && (
+        <ManageThemes
+          onNavigateBack={navigateBack}
+          onNavigateHome={navigateToPortfolio}
+          onNavigateAllApps={navigateToAllApps}
+          onNavigateKeyJourneys={navigateToAllJourneys}
+          onNavigateTopPains={navigateToTopPains}
+          onTabChange={handleAdminTabChange}
+        />
+      )}
+      {currentView === 'admin-manage-journeys' && (
+        <ManageJourneys
+          onNavigateBack={navigateBack}
+          onNavigateHome={navigateToPortfolio}
+          onNavigateAllApps={navigateToAllApps}
+          onNavigateKeyJourneys={navigateToAllJourneys}
+          onNavigateTopPains={navigateToTopPains}
+          onTabChange={handleAdminTabChange}
+        />
+      )}
+      {currentView === 'admin-manage-apps' && (
+        <ManageApps
+          onNavigateBack={navigateBack}
+          onNavigateHome={navigateToPortfolio}
+          onNavigateAllApps={navigateToAllApps}
+          onNavigateKeyJourneys={navigateToAllJourneys}
+          onNavigateTopPains={navigateToTopPains}
+          onTabChange={handleAdminTabChange}
+        />
+      )}
+      {currentView === 'admin-settings' && (
+        <ManageSettings
+          onNavigateBack={navigateBack}
+          onNavigateHome={navigateToPortfolio}
+          onNavigateAllApps={navigateToAllApps}
+          onNavigateKeyJourneys={navigateToAllJourneys}
+          onNavigateTopPains={navigateToTopPains}
+          onTabChange={handleAdminTabChange}
+        />
+      )}
+      {currentView === 'export-report' && (
+        <ExportReport
+          onNavigateBack={navigateBack}
+          onNavigateHome={navigateToPortfolio}
+          onNavigateAllApps={navigateToAllApps}
+          onNavigateKeyJourneys={navigateToAllJourneys}
+          onNavigateTopPains={navigateToTopPains}
+          onNavigateAdmin={navigateToAdminThemes}
         />
       )}
     </div>

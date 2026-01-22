@@ -1,5 +1,7 @@
+import React, { useState } from 'react';
 import { Button } from './ui/button';
 import { FileDown } from 'lucide-react';
+import { AdminPasswordDialog } from './AdminPasswordDialog';
 
 interface NavigationHeaderProps {
   currentView: 'home' | 'all-apps' | 'key-journeys' | 'top-pains' | 'other';
@@ -7,6 +9,8 @@ interface NavigationHeaderProps {
   onNavigateAllApps: () => void;
   onNavigateKeyJourneys: () => void;
   onNavigateTopPains: () => void;
+  onNavigateAdmin?: () => void;
+  onNavigateExport?: () => void;
   title: string;
   subtitle?: string;
   lastUpdated?: string;
@@ -19,6 +23,8 @@ export function NavigationHeader({
   onNavigateAllApps,
   onNavigateKeyJourneys,
   onNavigateTopPains,
+  onNavigateAdmin,
+  onNavigateExport,
   title,
   subtitle,
   lastUpdated,
@@ -30,6 +36,8 @@ export function NavigationHeader({
     { id: 'key-journeys', label: 'Key Journeys', onClick: onNavigateKeyJourneys },
     { id: 'top-pains', label: 'Top Pains', onClick: onNavigateTopPains },
   ];
+
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
 
   return (
     <header className="border-b border-slate-200 bg-slate-900 text-white">
@@ -63,17 +71,45 @@ export function NavigationHeader({
             <h1 className="font-semibold">{title}</h1>
             {subtitle && <p className="text-slate-300 mt-1 text-sm">{subtitle}</p>}
           </div>
-          {showExportButton && (
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full lg:w-auto">
-              <Button variant="outline" size="sm" className="bg-slate-800 border-slate-700 text-white hover:bg-slate-700 w-full sm:w-auto">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full lg:w-auto">
+            {showExportButton && (
+              <Button
+                onClick={onNavigateExport}
+                disabled={!onNavigateExport}
+                variant="outline"
+                size="sm"
+                className="bg-slate-800 border-slate-700 text-white hover:bg-slate-700 w-full sm:w-auto"
+              >
                 <FileDown className="size-4 mr-2" />
                 Export PDF
               </Button>
-            </div>
-          )}
+            )}
+            {onNavigateAdmin && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setIsDialogOpen(true)}
+                className="bg-slate-800 border-slate-700 text-white hover:bg-slate-700 w-full sm:w-auto"
+                title="Admin Access"
+              >
+                👀
+              </Button>
+            )}
+          </div>
         </div>
         {lastUpdated && <p className="text-slate-400 mt-3 text-sm">Last updated: {lastUpdated}</p>}
       </div>
+
+      {onNavigateAdmin && (
+        <AdminPasswordDialog
+          open={isDialogOpen}
+          onClose={() => setIsDialogOpen(false)}
+          onSuccess={() => {
+            setIsDialogOpen(false);
+            onNavigateAdmin();
+          }}
+        />
+      )}
     </header>
   );
 }

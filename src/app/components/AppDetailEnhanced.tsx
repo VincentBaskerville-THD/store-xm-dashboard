@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { ArrowLeft, FileDown, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from './ui/button';
 import { Card } from './ui/card';
@@ -18,6 +18,8 @@ interface AppDetailEnhancedProps {
   onNavigateAllApps?: () => void;
   onNavigateKeyJourneys?: () => void;
   onNavigateTopPains?: () => void;
+  onNavigateAdmin?: () => void;
+  onNavigateExport?: () => void;
 }
 
 type AppMetricsRow = {
@@ -36,7 +38,18 @@ type AppMetricsRow = {
   response_count: number | null;
 };
 
-export function AppDetailEnhanced({ appId, timePeriod, onTimePeriodChange, onNavigateBack, onNavigateHome, onNavigateAllApps, onNavigateKeyJourneys, onNavigateTopPains }: AppDetailEnhancedProps) {
+export function AppDetailEnhanced({
+  appId,
+  timePeriod,
+  onTimePeriodChange,
+  onNavigateBack,
+  onNavigateHome,
+  onNavigateAllApps,
+  onNavigateKeyJourneys,
+  onNavigateTopPains,
+  onNavigateAdmin,
+  onNavigateExport,
+}: AppDetailEnhancedProps) {
   // Live series for one app across time; drives header, summary, and charts.
   const [appSeries, setAppSeries] = useState<AppMetricsRow[]>([]);
   const [availablePeriods, setAvailablePeriods] = useState<string[]>([]);
@@ -283,6 +296,8 @@ export function AppDetailEnhanced({ appId, timePeriod, onTimePeriodChange, onNav
         onNavigateAllApps={onNavigateAllApps || onNavigateBack}
         onNavigateKeyJourneys={onNavigateKeyJourneys || onNavigateBack}
         onNavigateTopPains={onNavigateTopPains || onNavigateBack}
+        onNavigateAdmin={onNavigateAdmin}
+        onNavigateExport={onNavigateExport}
         title={appName ?? appId}
         subtitle={headerSubtitle}
         showExportButton={true}

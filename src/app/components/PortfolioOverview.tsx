@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { ArrowLeft, FileDown, TrendingUp, TrendingDown, LayoutGrid, Route, Clock } from 'lucide-react';
 import { Button } from './ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectGroup, SelectLabel, SelectSeparator } from './ui/select';
@@ -16,6 +16,8 @@ interface PortfolioOverviewProps {
   onNavigateToApp: (appId: string) => void;
   onNavigateToJourney: (journeyId: string) => void;
   onNavigateToView: (view: ViewType) => void;
+  onNavigateAdmin?: () => void;
+  onNavigateExport?: () => void;
 }
 
 type SortField = 'name' | 'overallScore' | 'scoreMoM' | 'easeOfUse' | 'usefulness' | 'responses';
@@ -54,6 +56,8 @@ export function PortfolioOverview({
   onNavigateToApp,
   onNavigateToJourney,
   onNavigateToView,
+  onNavigateAdmin,
+  onNavigateExport,
 }: PortfolioOverviewProps) {
   // UI state + data state for the portfolio view (sorts, filters, and fetched metrics).
   const [sortField, setSortField] = useState<SortField>('name');
@@ -387,6 +391,8 @@ export function PortfolioOverview({
         onNavigateAllApps={() => onNavigateToView('all-apps')}
         onNavigateKeyJourneys={() => onNavigateToView('all-journeys')}
         onNavigateTopPains={() => onNavigateToView('top-pains')}
+        onNavigateAdmin={onNavigateAdmin}
+        onNavigateExport={onNavigateExport}
         title="Store Ops Portfolio Experience Metrics"
         subtitle="Performance dashboard for all applications and journeys"
         lastUpdated={formatLastUpdated(lastUpdatedAt)}

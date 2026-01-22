@@ -21,6 +21,8 @@ interface JourneyDetailEnhancedProps {
   onNavigateAllApps?: () => void;
   onNavigateKeyJourneys?: () => void;
   onNavigateTopPains?: () => void;
+  onNavigateAdmin?: () => void;
+  onNavigateExport?: () => void;
 }
 
 type TrendView = 'overall' | 'by-app' | 'by-step';
@@ -34,7 +36,9 @@ export function JourneyDetailEnhanced({
   onNavigateHome,
   onNavigateAllApps,
   onNavigateKeyJourneys,
-  onNavigateTopPains
+  onNavigateTopPains,
+  onNavigateAdmin,
+  onNavigateExport
 }: JourneyDetailEnhancedProps) {
   const [trendView, setTrendView] = useState<TrendView>('overall');
   const [showDetailedTable, setShowDetailedTable] = useState(false);
@@ -213,22 +217,25 @@ export function JourneyDetailEnhanced({
 
   // Contributing apps
   const contributingApps = [
-    { appId: '1', appName: '1Returns', score: 79, touchpoints: 3, description: 'Primary returns processing', color: 'blue' },
-    { appId: '5', appName: 'Inventory Manager', score: 81, touchpoints: 2, description: 'Stock verification', color: 'green' },
-    { appId: '3', appName: 'Order Up', score: 66, touchpoints: 2, description: 'Refund processing', color: 'purple' },
-    { appId: '6', appName: 'Customer Portal', score: 68, touchpoints: 1, description: 'Customer record updates', color: 'amber' },
+    { appId: '1', appName: '1Returns', score: 79, prevScore: 75, touchpoints: 3, description: 'Primary returns processing', color: 'blue' },
+    { appId: '5', appName: 'Inventory Manager', score: 81, prevScore: 78, touchpoints: 2, description: 'Stock verification', color: 'green' },
+    { appId: '3', appName: 'Order Up', score: 66, prevScore: 63, touchpoints: 2, description: 'Refund processing', color: 'purple' },
+    { appId: '6', appName: 'Customer Portal', score: 68, prevScore: 65, touchpoints: 1, description: 'Customer record updates', color: 'amber' },
+    // Apps without scores (not being tracked)
+    { appId: '12', appName: 'Shipping Manager', score: null, prevScore: null, touchpoints: 1, description: 'Shipping label generation and tracking', color: 'cyan' },
+    { appId: '8', appName: 'Fulfillment Hub', score: null, prevScore: null, touchpoints: 1, description: 'Warehouse receipt confirmation', color: 'indigo' },
   ];
 
-  // Touchpoint breakdown
+  // Touchpoint breakdown - scores only exist if the app is being tracked
   const touchpointData = [
-    { step: 1, touchpoint: 'Initiate Return', app: '1Returns', score: 82, appId: '1', color: 'blue' },
-    { step: 2, touchpoint: 'Verify Eligibility', app: '1Returns', score: 79, appId: '1', color: 'blue' },
-    { step: 3, touchpoint: 'Process Refund', app: 'Order Up', score: 71, appId: '3', color: 'purple' },
-    { step: 4, touchpoint: 'Update Customer Record', app: 'Customer Portal', score: 68, appId: '6', color: 'amber' },
-    { step: 5, touchpoint: 'Generate Return Label', app: '1Returns', score: 79, appId: '1', color: 'blue' },
-    { step: 6, touchpoint: 'Track Return Shipment', app: 'Shipping Manager', score: 73, appId: '12', color: 'cyan' },
-    { step: 7, touchpoint: 'Confirm Receipt', app: 'Fulfillment Hub', score: 76, appId: '8', color: 'indigo' },
-    { step: 8, touchpoint: 'Close Return Case', app: '1Returns', score: 77, appId: '1', color: 'blue' },
+    { step: 1, touchpoint: 'Initiate Return', app: '1Returns', score: 82, prevScore: 78, appId: '1', color: 'blue', description: 'Customer starts return process through online portal' },
+    { step: 2, touchpoint: 'Verify Eligibility', app: '1Returns', score: 79, prevScore: 75, appId: '1', color: 'blue', description: 'System checks if product qualifies for return based on policy' },
+    { step: 3, touchpoint: 'Process Refund', app: 'Order Up', score: 71, prevScore: 68, appId: '3', color: 'purple', description: 'Refund amount is calculated and initiated' },
+    { step: 4, touchpoint: 'Update Customer Record', app: 'Customer Portal', score: 68, prevScore: 65, appId: '6', color: 'amber', description: 'Customer account is updated with return transaction details' },
+    { step: 5, touchpoint: 'Generate Return Label', app: '1Returns', score: 79, prevScore: 76, appId: '1', color: 'blue', description: 'Shipping label is created and sent to customer' },
+    { step: 6, touchpoint: 'Track Return Shipment', app: 'Shipping Manager', score: null, prevScore: null, appId: '12', color: 'cyan', description: 'Package location is monitored during transit' },
+    { step: 7, touchpoint: 'Confirm Receipt', app: 'Fulfillment Hub', score: null, prevScore: null, appId: '8', color: 'indigo', description: 'Returned item arrives at warehouse and is logged' },
+    { step: 8, touchpoint: 'Close Return Case', app: '1Returns', score: 77, prevScore: 74, appId: '1', color: 'blue', description: 'Return transaction is finalized and closed' },
   ];
 
   // Helper function to get border color class based on app color
@@ -334,6 +341,8 @@ export function JourneyDetailEnhanced({
         onNavigateAllApps={onNavigateAllApps || onNavigateBack}
         onNavigateKeyJourneys={onNavigateKeyJourneys || onNavigateBack}
         onNavigateTopPains={onNavigateTopPains || onNavigateBack}
+        onNavigateAdmin={onNavigateAdmin}
+        onNavigateExport={onNavigateExport}
         title={journey.name}
         subtitle="End-to-end journey performance"
         showExportButton={true}
@@ -398,89 +407,274 @@ export function JourneyDetailEnhanced({
 
         {/* Experience Journey */}
         <section className="mb-8">
-          <h2 className="text-slate-900 mb-4">Experience Journey</h2>
+          <div className="mb-4">
+            <div className="flex items-center justify-between mb-2">
+              <div>
+                <h2 className="text-slate-900">Experience Journey</h2>
+                <p className="text-sm text-slate-500 italic font-light mt-0.5">
+                  Tracking {touchpointData.filter(tp => tp.score !== null).length} out of {touchpointData.length} steps
+                </p>
+              </div>
+              {/* Active/Inactive Status Badge */}
+              <div className="flex items-center gap-2">
+                <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold ${
+                  journey.id === '1' || journey.id === '2' // Mock: first two journeys are active
+                    ? 'bg-green-100 text-green-800'
+                    : 'bg-slate-100 text-slate-600'
+                }`}>
+                  <span className={`size-2 rounded-full ${
+                    journey.id === '1' || journey.id === '2' 
+                      ? 'bg-green-600' 
+                      : 'bg-slate-400'
+                  }`} />
+                  {journey.id === '1' || journey.id === '2' ? (
+                    <>
+                      Collecting Data
+                      <span className="text-slate-400 mx-0.5">·</span>
+                      {journey.id === '1' ? 'Monthly' : 'Quarterly'}
+                    </>
+                  ) : (
+                    <>Measured Jan – Jul 2024</>
+                  )}
+                </span>
+              </div>
+            </div>
+          </div>
           
           {/* Journey Flow Visualization */}
-          <Card className="p-6 border-slate-200 mb-6 overflow-x-auto">
-            <div className="min-w-max">
-              {/* Layer 1: Overall Journey - Full width */}
-              <div className="mb-6 px-4">
-                <div className="bg-orange-50 border border-orange-200 rounded-md px-6 py-3 flex items-center justify-between">
-                  <span className="text-slate-900 font-semibold">{journey.name}</span>
+          <Card className="p-6 border-slate-200 mb-6">
+            {/* Layer 1: Overall Journey - Full width, no scroll */}
+            <div className="mb-6">
+              <div className="bg-orange-50 border border-orange-200 rounded-md px-6 py-3 flex items-start justify-between gap-4">
+                <div className="flex-1">
+                  <span className="text-slate-900 font-semibold block mb-1">{journey.name}</span>
+                  {journey.description && (
+                    <span className="text-slate-600 text-sm block">{journey.description}</span>
+                  )}
+                </div>
+                <div className="flex flex-col items-end flex-shrink-0">
                   <span className={`text-xl font-semibold ${getScoreColor(journey.overallScore)}`}>
                     {journey.overallScore}
                   </span>
-                </div>
-              </div>
-
-              {/* Layer 2: Touchpoints - Minimal styling */}
-              <div className="mb-3">
-                <div className="flex gap-3 justify-start px-4">
-                  {touchpointData.map((touchpoint) => (
-                    <button
-                      key={touchpoint.step}
-                      onClick={() => onNavigateToApp(touchpoint.appId)}
-                      className="bg-white hover:bg-slate-50 border border-slate-300 hover:border-orange-400 rounded px-3 py-2 transition-all w-[120px] flex-shrink-0"
-                    >
-                      <div className="flex flex-col items-center">
-                        <span className="text-slate-600 text-[10px] mb-1">Step {touchpoint.step}</span>
-                        <span className="text-slate-900 font-medium text-[11px] mb-1 text-center leading-tight line-clamp-2">{touchpoint.touchpoint}</span>
-                        <span className={`text-lg font-semibold ${getScoreColor(touchpoint.score)}`}>
-                          {touchpoint.score}
-                        </span>
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Layer 3: Apps - Minimal styling, spanning across consecutive touchpoints */}
-              <div>
-                <div className="flex gap-3 justify-start px-4 relative">
                   {(() => {
-                    const appSpans: JSX.Element[] = [];
-                    let currentIndex = 0;
+                    // Calculate previous period score based on time period
+                    const data = timePeriod.format === 'quarter' ? quarterlyData : monthlyData;
+                    const currentScore = journey.overallScore;
+                    const previousScore = data.length >= 2 ? data[data.length - 2].score : currentScore;
+                    const diff = currentScore - previousScore;
+                    const diffPercent = previousScore > 0 ? ((diff / previousScore) * 100).toFixed(0) : '0';
+                    const timeLabel = timePeriod.format === 'quarter' ? 'QoQ' : timePeriod.format === 'year' ? 'YoY' : 'MoM';
                     
-                    while (currentIndex < touchpointData.length) {
-                      const currentTouchpoint = touchpointData[currentIndex];
-                      const app = contributingApps.find(a => a.appId === currentTouchpoint.appId);
-                      
-                      // Count consecutive touchpoints with the same app
-                      let spanCount = 1;
-                      while (
-                        currentIndex + spanCount < touchpointData.length && 
-                        touchpointData[currentIndex + spanCount].appId === currentTouchpoint.appId
-                      ) {
-                        spanCount++;
-                      }
-                      
-                      // Calculate width: (120px * spanCount) + (12px gap * (spanCount - 1))
-                      const width = spanCount * 120 + (spanCount - 1) * 12;
-                      
-                      appSpans.push(
-                        <button
-                          key={`span-${currentIndex}`}
-                          onClick={() => onNavigateToApp(currentTouchpoint.appId)}
-                          style={{ width: `${width}px` }}
-                          className="bg-slate-50 hover:bg-slate-100 border border-slate-300 hover:border-orange-400 rounded px-3 py-2 transition-all flex-shrink-0"
-                        >
-                          <div className="flex flex-col items-center">
-                            <span className="text-slate-900 font-semibold text-[11px] mb-1 text-center line-clamp-1">{currentTouchpoint.app}</span>
-                            <span className={`text-sm font-semibold ${app ? getScoreColor(app.score) : 'text-slate-700'}`}>
-                              {app ? app.score : '--'}
-                            </span>
-                            {spanCount > 1 && (
-                              <span className="text-slate-500 text-[10px] mt-0.5">{spanCount} touchpoints</span>
-                            )}
-                          </div>
-                        </button>
-                      );
-                      
-                      currentIndex += spanCount;
-                    }
-                    
-                    return appSpans;
+                    return (
+                      <span className={`text-xs font-medium ${
+                        diff > 0 ? 'text-green-700' : diff < 0 ? 'text-red-700' : 'text-slate-500'
+                      }`}>
+                        {diff > 0 ? '+' : ''}{diffPercent}% {timeLabel}
+                      </span>
+                    );
                   })()}
+                </div>
+              </div>
+            </div>
+
+            {/* Layer 2 & 3: Steps and Apps - Scrollable with content peeking out on right */}
+            <div className="relative -mr-6 pr-6">
+              <div className="overflow-x-scroll pb-2">
+                <div className="min-w-max pr-20">
+                {(() => {
+                // Pre-calculate widths for each step based on app span coverage
+                const stepWidths: number[] = [];
+                let currentIndex = 0;
+                
+                while (currentIndex < touchpointData.length) {
+                  const currentTouchpoint = touchpointData[currentIndex];
+                  
+                  // Count consecutive touchpoints with the same app
+                  let spanCount = 1;
+                  while (
+                    currentIndex + spanCount < touchpointData.length && 
+                    touchpointData[currentIndex + spanCount].appId === currentTouchpoint.appId
+                  ) {
+                    spanCount++;
+                  }
+                  
+                  // Calculate width: (120px * spanCount) + (12px gap * (spanCount - 1))
+                  // Add extra width for longer app names - minimum 120px per step, but can expand
+                  const baseWidth = spanCount * 120 + (spanCount - 1) * 12;
+                  const appNameLength = currentTouchpoint.app.length;
+                  // Add extra width if app name is long (more than 8 characters)
+                  const extraWidth = appNameLength > 8 ? Math.min((appNameLength - 8) * 6, 40) : 0;
+                  const totalWidth = baseWidth + extraWidth;
+                  
+                  // Calculate individual step width from total
+                  const individualStepWidth = (totalWidth - (spanCount - 1) * 12) / spanCount;
+                  
+                  // Assign this width to all steps in this span
+                  for (let i = 0; i < spanCount; i++) {
+                    stepWidths[currentIndex + i] = individualStepWidth;
+                  }
+                  
+                  currentIndex += spanCount;
+                }
+
+                return (
+                  <>
+                    {/* Layer 2: Touchpoints - With hover descriptions and time comparisons */}
+                    <div className="mb-3">
+                      <div className="flex gap-3 justify-start px-4">
+                        {touchpointData.map((touchpoint, index) => {
+                          const hasScore = touchpoint.score !== null;
+                          const diff = hasScore ? touchpoint.score - touchpoint.prevScore : 0;
+                          const diffPercent = hasScore && touchpoint.prevScore > 0 
+                            ? ((diff / touchpoint.prevScore) * 100).toFixed(0)
+                            : '0';
+                          const timeLabel = timePeriod.format === 'quarter' ? 'QoQ' : timePeriod.format === 'year' ? 'YoY' : 'MoM';
+                          
+                          // Smart tooltip positioning to prevent clipping
+                          const isFirstTwo = index < 2;
+                          const isLastTwo = index >= touchpointData.length - 2;
+                          const tooltipPositionClass = isFirstTwo 
+                            ? 'left-0' 
+                            : isLastTwo 
+                            ? 'right-0' 
+                            : 'left-1/2 -translate-x-1/2';
+                          
+                          return (
+                            <div
+                              key={touchpoint.step}
+                              title={touchpoint.description}
+                              style={{ width: `${stepWidths[index]}px` }}
+                              className={`rounded px-3 py-2 flex-shrink-0 cursor-default relative group ${
+                                hasScore 
+                                  ? 'bg-white border border-slate-300' 
+                                  : 'bg-slate-50 border border-dashed border-slate-300 opacity-50'
+                              }`}
+                            >
+                              <div className="flex flex-col items-center">
+                                <span className={`text-[10px] mb-1 ${hasScore ? 'text-slate-600' : 'text-slate-500'}`}>
+                                  Step {touchpoint.step}
+                                </span>
+                                <span className={`font-medium text-[11px] mb-1 text-center leading-tight line-clamp-2 ${
+                                  hasScore ? 'text-slate-900' : 'text-slate-500'
+                                }`}>
+                                  {touchpoint.touchpoint}
+                                </span>
+                                <div className="flex items-center gap-1">
+                                  {hasScore ? (
+                                    <span className={`text-lg font-semibold ${getScoreColor(touchpoint.score)}`}>
+                                      {touchpoint.score}
+                                    </span>
+                                  ) : (
+                                    <span className="text-sm font-medium text-slate-400">--</span>
+                                  )}
+                                </div>
+                                {hasScore && (
+                                  <span className={`text-[10px] font-medium ${
+                                    diff > 0 ? 'text-green-700' : diff < 0 ? 'text-red-700' : 'text-slate-500'
+                                  }`}>
+                                    {diff > 0 ? '+' : ''}{diffPercent}% {timeLabel}
+                                  </span>
+                                )}
+                              </div>
+                              {/* Tooltip with smart positioning */}
+                              <div className={`absolute ${tooltipPositionClass} bottom-full mb-2 hidden group-hover:block z-10 w-64`}>
+                                <div className="bg-slate-900 text-white text-xs rounded-lg px-3 py-2 shadow-lg">
+                                  <div className="font-semibold mb-1">Step {touchpoint.step}: {touchpoint.touchpoint}</div>
+                                  <div className="text-slate-300">{touchpoint.description}</div>
+                                  {!hasScore && (
+                                    <div className="mt-2 pt-2 border-t border-slate-700 text-slate-400 italic">
+                                      App not currently being tracked
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Layer 3: Apps - With time comparisons instead of touchpoint count */}
+                    <div>
+                      <div className="flex gap-3 justify-start px-4 relative">
+                        {(() => {
+                          const appSpans: JSX.Element[] = [];
+                          let currentIndex = 0;
+                          
+                          while (currentIndex < touchpointData.length) {
+                            const currentTouchpoint = touchpointData[currentIndex];
+                            const app = contributingApps.find(a => a.appId === currentTouchpoint.appId);
+                            
+                            // Count consecutive touchpoints with the same app
+                            let spanCount = 1;
+                            while (
+                              currentIndex + spanCount < touchpointData.length && 
+                              touchpointData[currentIndex + spanCount].appId === currentTouchpoint.appId
+                            ) {
+                              spanCount++;
+                            }
+                            
+                            // Calculate width: sum of step widths + gaps
+                            let width = 0;
+                            for (let i = 0; i < spanCount; i++) {
+                              width += stepWidths[currentIndex + i];
+                            }
+                            width += (spanCount - 1) * 12; // Add gaps between steps
+                            
+                            // Calculate time comparison for this app
+                            const hasScore = app && app.score !== null;
+                            const appDiff = hasScore && app.prevScore ? app.score - app.prevScore : 0;
+                            const appDiffPercent = hasScore && app.prevScore > 0 
+                              ? ((appDiff / app.prevScore) * 100).toFixed(0)
+                              : '0';
+                            const timeLabel = timePeriod.format === 'quarter' ? 'QoQ' : timePeriod.format === 'year' ? 'YoY' : 'MoM';
+                            
+                            appSpans.push(
+                              <div
+                                key={`span-${currentIndex}`}
+                                style={{ width: `${width}px` }}
+                                className={`rounded px-3 py-2 flex-shrink-0 cursor-default ${
+                                  hasScore 
+                                    ? 'bg-slate-50 border border-slate-300' 
+                                    : 'bg-slate-100 border border-dashed border-slate-400 opacity-50'
+                                }`}
+                              >
+                                <div className="flex flex-col items-center">
+                                  <span className={`font-semibold text-[11px] mb-1 text-center leading-tight max-w-full px-1 ${
+                                    hasScore ? 'text-slate-900' : 'text-slate-500'
+                                  }`}>
+                                    {currentTouchpoint.app}
+                                  </span>
+                                  {hasScore ? (
+                                    <>
+                                      <span className={`text-sm font-semibold ${getScoreColor(app.score)}`}>
+                                        {app.score}
+                                      </span>
+                                      {app.prevScore && (
+                                        <span className={`text-[10px] font-medium ${
+                                          appDiff > 0 ? 'text-green-700' : appDiff < 0 ? 'text-red-700' : 'text-slate-500'
+                                        }`}>
+                                          {appDiff > 0 ? '+' : ''}{appDiffPercent}% {timeLabel}
+                                        </span>
+                                      )}
+                                    </>
+                                  ) : (
+                                    <span className="text-sm font-medium text-slate-400">Not tracked</span>
+                                  )}
+                                </div>
+                              </div>
+                            );
+                            
+                            currentIndex += spanCount;
+                          }
+                          
+                          return appSpans;
+                        })()}
+                      </div>
+                    </div>
+                  </>
+                );
+              })()}
                 </div>
               </div>
             </div>
