@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { ArrowLeft, FileDown, AlertTriangle, TrendingUp, TrendingDown, AlertCircle, Info, Link2, Clock, X, BarChart3, LineChart } from 'lucide-react';
+import { ArrowLeft, FileDown, AlertTriangle, TrendingUp, TrendingDown, AlertCircle, Info, Link2, Clock, X, BarChart3, LineChart, Construction } from 'lucide-react';
 import { Button } from './ui/button';
 import { Card } from './ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
@@ -19,6 +19,7 @@ interface TopPainsProps {
   onNavigateTopPains?: () => void;
   onNavigateAdmin?: () => void;
   onNavigateExport?: () => void;
+  isFeatureEnabled?: boolean;
 }
 
 interface PainPoint {
@@ -600,7 +601,36 @@ export function TopPains({
   onNavigateTopPains,
   onNavigateAdmin,
   onNavigateExport,
+  isFeatureEnabled = true,
 }: TopPainsProps) {
+  if (!isFeatureEnabled) {
+    return (
+      <div className="min-h-screen bg-white">
+        <NavigationHeader
+          currentView="top-pains"
+          onNavigateHome={onNavigateHome || onNavigateBack}
+          onNavigateAllApps={onNavigateAllApps || onNavigateBack}
+          onNavigateKeyJourneys={onNavigateKeyJourneys || onNavigateBack}
+          onNavigateTopPains={onNavigateTopPains || (() => {})}
+          onNavigateAdmin={onNavigateAdmin}
+          onNavigateExport={onNavigateExport}
+          title="Top Pains"
+          subtitle="Emerging experience issues across the portfolio"
+          showExportButton={true}
+        />
+        <div className="mx-auto max-w-4xl px-4 sm:px-6 lg:px-8 py-10">
+          <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-10 text-center">
+            <Construction className="mx-auto size-12 text-orange-500" />
+            <h2 className="mt-4 text-xl font-semibold text-slate-900">Work in progress</h2>
+            <p className="mt-2 text-slate-600">
+              This functionality is coming soon. Check back in a few days &amp;/or give Vincent a ping.
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   const [scopeFilter, setScopeFilter] = useState<string>('all');
   const [visualizationView, setVisualizationView] = useState<'both' | 'ranking' | 'trends'>('both');
   const [selectedPainForDetail, setSelectedPainForDetail] = useState<PainPoint | null>(null);

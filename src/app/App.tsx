@@ -13,6 +13,7 @@ import { ManageThemes } from './components/ManageThemes';
 import { ManageJourneys } from './components/ManageJourneys';
 import { ManageApps } from './components/ManageApps';
 import { ManageSettings } from './components/ManageSettings';
+import { ManageFeatureFlags } from './components/ManageFeatureFlags';
 import { ExportReport } from './components/ExportReport';
 import { AdminPasswordDialog } from './components/AdminPasswordDialog';
 import type { TimePeriodData } from './components/TimeSelector';
@@ -32,6 +33,7 @@ export type ViewType =
   | 'admin-manage-themes'
   | 'admin-manage-journeys'
   | 'admin-manage-apps'
+  | 'admin-feature-flags'
   | 'admin-settings'
   | 'export-report';
 export type TimePeriod = 'November 2025' | 'October 2025' | 'Q4 2025' | 'Q3 2025' | '2025' | '2024';
@@ -68,6 +70,11 @@ interface NavigationState {
   selectedJourney?: string | null;
 }
 
+interface FeatureFlags {
+  keyJourneysEnabled: boolean;
+  topPainsEnabled: boolean;
+}
+
 function App() {
   const [currentView, setCurrentView] = useState<ViewType>('portfolio');
   const [selectedApp, setSelectedApp] = useState<string | null>(null);
@@ -85,12 +92,27 @@ function App() {
     format: 'month',
     period: 'November 2025',
   });
+  const [featureFlags, setFeatureFlags] = useState<FeatureFlags>(() => {
+    const defaults: FeatureFlags = { keyJourneysEnabled: false, topPainsEnabled: false };
+    const stored = localStorage.getItem('featureFlags');
+    if (!stored) return defaults;
+    try {
+      const parsed = JSON.parse(stored) as Partial<FeatureFlags>;
+      return { ...defaults, ...parsed };
+    } catch {
+      return defaults;
+    }
+  });
 
   useEffect(() => {
     document.title = currentView.startsWith('admin')
       ? 'Admin: Manage Dashboard'
       : 'Store XM Dashboard';
   }, [currentView]);
+
+  useEffect(() => {
+    localStorage.setItem('featureFlags', JSON.stringify(featureFlags));
+  }, [featureFlags]);
 
   const pushToHistory = (view: ViewType, appId?: string | null, journeyId?: string | null) => {
     const newState: NavigationState = {
@@ -203,6 +225,14 @@ function App() {
     syncPath('admin-settings');
   };
 
+  const navigateToFeatureFlags = () => {
+    pushToHistory('admin-feature-flags', null, null);
+    setCurrentView('admin-feature-flags');
+    setSelectedApp(null);
+    setSelectedJourney(null);
+    syncPath('admin-feature-flags');
+  };
+
   const navigateToExport = () => {
     pushToHistory('export-report', null, null);
     setCurrentView('export-report');
@@ -250,13 +280,15 @@ function App() {
     window.addEventListener('popstate', handlePath);
     return () => window.removeEventListener('popstate', handlePath);
   }, [adminAuthEnabled, adminAuthenticated, adminPath]);
-  const handleAdminTabChange = (tab: 'manage-themes' | 'manage-journeys' | 'manage-apps' | 'settings') => {
+  const handleAdminTabChange = (tab: 'manage-themes' | 'manage-journeys' | 'manage-apps' | 'feature-flags' | 'settings') => {
     if (tab === 'manage-themes') {
       navigateToManageThemes();
     } else if (tab === 'manage-journeys') {
       navigateToManageJourneys();
     } else if (tab === 'manage-apps') {
       navigateToManageApps();
+    } else if (tab === 'feature-flags') {
+      navigateToFeatureFlags();
     } else if (tab === 'settings') {
       navigateToManageSettings();
     }
@@ -391,6 +423,7 @@ function App() {
           onNavigateTopPains={navigateToTopPains}
           onNavigateAdmin={requestAdminAccess}
           onNavigateExport={navigateToExport}
+          isFeatureEnabled={featureFlags.keyJourneysEnabled}
         />
       )}
       {currentView === 'time-series' && (
@@ -429,6 +462,7 @@ function App() {
           onNavigateTopPains={navigateToTopPains}
           onNavigateAdmin={navigateToAdminThemes}
           onNavigateExport={navigateToExport}
+          isFeatureEnabled={featureFlags.topPainsEnabled}
         />
       )}
       {currentView === 'admin-manage-themes' && (
@@ -459,6 +493,18 @@ function App() {
           onNavigateKeyJourneys={navigateToAllJourneys}
           onNavigateTopPains={navigateToTopPains}
           onTabChange={handleAdminTabChange}
+        />
+      )}
+      {currentView === 'admin-feature-flags' && (
+        <ManageFeatureFlags
+          onNavigateBack={navigateBack}
+          onNavigateHome={navigateToPortfolio}
+          onNavigateAllApps={navigateToAllApps}
+          onNavigateKeyJourneys={navigateToAllJourneys}
+          onNavigateTopPains={navigateToTopPains}
+          onTabChange={handleAdminTabChange}
+          flags={featureFlags}
+          onFlagsChange={setFeatureFlags}
         />
       )}
       {currentView === 'admin-settings' && (

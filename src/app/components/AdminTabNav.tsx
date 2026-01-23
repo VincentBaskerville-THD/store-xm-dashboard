@@ -1,8 +1,9 @@
-import { FileText, Database, Map, Settings, Lock } from 'lucide-react';
+import React from 'react';
+import { FileText, Database, Map, Settings, Lock, Flag } from 'lucide-react';
 
 interface AdminTabNavProps {
-  activeTab: 'manage-themes' | 'manage-journeys' | 'manage-apps' | 'settings';
-  onTabChange: (tab: 'manage-themes' | 'manage-journeys' | 'manage-apps' | 'settings') => void;
+  activeTab: 'manage-themes' | 'manage-journeys' | 'manage-apps' | 'feature-flags' | 'settings';
+  onTabChange: (tab: 'manage-themes' | 'manage-journeys' | 'manage-apps' | 'feature-flags' | 'settings') => void;
 }
 
 export function AdminTabNav({ activeTab, onTabChange }: AdminTabNavProps) {
@@ -10,6 +11,7 @@ export function AdminTabNav({ activeTab, onTabChange }: AdminTabNavProps) {
     { id: 'manage-themes' as const, label: 'Manage Themes', icon: Database },
     { id: 'manage-journeys' as const, label: 'Manage Journeys', icon: Map },
     { id: 'manage-apps' as const, label: 'Manage Apps', icon: Settings },
+    { id: 'feature-flags' as const, label: 'Feature Flags', icon: Flag },
     { id: 'settings' as const, label: 'Settings', icon: Lock },
   ];
 

@@ -1080,7 +1080,7 @@ export function ExportReport({
   const [metricsPeriodLabel, setMetricsPeriodLabel] = useState<string | null>(null);
   const [isMetricsLoading, setIsMetricsLoading] = useState(false);
   const [metricsError, setMetricsError] = useState<string | null>(null);
-  const [hasInitializedApps, setHasInitializedApps] = useState(false);
+  const [hasCustomAppSelection, setHasCustomAppSelection] = useState(false);
   const [appQuarterSeries, setAppQuarterSeries] = useState<Record<string, AppQuarterRow[]>>({});
   const [appTopBox, setAppTopBox] = useState<Record<string, { ease: number | null; usefulness: number | null }>>({});
   const [quarterLabels, setQuarterLabels] = useState<Array<{ period: string; label: string }>>([]);
@@ -1111,6 +1111,7 @@ export function ExportReport({
   };
 
   const toggleApp = (appId: string) => {
+    setHasCustomAppSelection(true);
     const currentApps = config.scoresConfig.selectedApps;
     const newApps = currentApps.includes(appId)
       ? currentApps.filter(id => id !== appId)
@@ -1119,6 +1120,7 @@ export function ExportReport({
   };
 
   const toggleAllApps = () => {
+    setHasCustomAppSelection(true);
     const allSelected = config.scoresConfig.selectedApps.length === exportApps.length;
     updateScoresConfig({ selectedApps: allSelected ? [] : exportApps.map(app => app.id) });
   };
@@ -1258,9 +1260,8 @@ export function ExportReport({
       setMetricsPeriodLabel(selectedLabel);
       setIsMetricsLoading(false);
 
-      if (!hasInitializedApps && mappedApps.length > 0) {
+      if (!hasCustomAppSelection) {
         updateScoresConfig({ selectedApps: mappedApps.map(app => app.id) });
-        setHasInitializedApps(true);
       }
     };
 
@@ -1272,7 +1273,7 @@ export function ExportReport({
   }, [
     config.scoresConfig.selectedMonth,
     config.scoresConfig.timePeriod,
-    hasInitializedApps,
+    hasCustomAppSelection,
     hasInitializedMonth,
     monthLabelToCode,
   ]);

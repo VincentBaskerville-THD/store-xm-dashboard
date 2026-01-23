@@ -17,7 +17,7 @@ interface AdminThemesViewProps {
   onNavigateAllApps: () => void;
   onNavigateKeyJourneys: () => void;
   onNavigateTopPains: () => void;
-  onTabChange: (tab: 'manage-themes' | 'manage-journeys' | 'manage-apps' | 'settings') => void;
+  onTabChange: (tab: 'manage-themes' | 'manage-journeys' | 'manage-apps' | 'feature-flags' | 'settings') => void;
 }
 
 interface ExistingTheme {
