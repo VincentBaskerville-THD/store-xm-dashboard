@@ -16,6 +16,7 @@ import { ManageSettings } from './components/ManageSettings';
 import { ManageFeatureFlags } from './components/ManageFeatureFlags';
 import { ExportReport } from './components/ExportReport';
 import { AdminPasswordDialog } from './components/AdminPasswordDialog';
+import { DashboardPasswordDialog } from './components/DashboardPasswordDialog';
 import type { TimePeriodData } from './components/TimeSelector';
 
 export type ViewType =
@@ -83,7 +84,11 @@ function App() {
   const [adminAuthEnabled, setAdminAuthEnabled] = useState(() => (localStorage.getItem('adminAuthEnabled') ?? 'true') !== 'false');
   const [adminShowButton, setAdminShowButton] = useState(() => (localStorage.getItem('adminShowButton') ?? 'true') !== 'false');
   const [adminAuthenticated, setAdminAuthenticated] = useState(() => sessionStorage.getItem('adminAuthed') === 'true');
+  const [dashboardPassword, setDashboardPassword] = useState(() => localStorage.getItem('dashboardPassword') ?? 'hammertime');
+  const [dashboardAuthEnabled, setDashboardAuthEnabled] = useState(() => (localStorage.getItem('dashboardAuthEnabled') ?? 'false') === 'true');
+  const [dashboardAuthenticated, setDashboardAuthenticated] = useState(() => sessionStorage.getItem('dashboardAuthed') === 'true');
   const [isAdminDialogOpen, setIsAdminDialogOpen] = useState(false);
+  const [isDashboardDialogOpen, setIsDashboardDialogOpen] = useState(false);
   const [pendingAdminRedirect, setPendingAdminRedirect] = useState(false);
   const [navigationHistory, setNavigationHistory] = useState<NavigationState[]>([
     { view: 'portfolio', selectedApp: null, selectedJourney: null }
@@ -268,6 +273,25 @@ function App() {
   }, [adminAuthEnabled]);
 
   useEffect(() => {
+    localStorage.setItem('dashboardPassword', dashboardPassword);
+  }, [dashboardPassword]);
+
+  useEffect(() => {
+    localStorage.setItem('dashboardAuthEnabled', String(dashboardAuthEnabled));
+    if (!dashboardAuthEnabled) {
+      sessionStorage.setItem('dashboardAuthed', 'true');
+      setDashboardAuthenticated(true);
+      setIsDashboardDialogOpen(false);
+    }
+  }, [dashboardAuthEnabled]);
+
+  useEffect(() => {
+    if (dashboardAuthEnabled && !dashboardAuthenticated) {
+      setIsDashboardDialogOpen(true);
+    }
+  }, [dashboardAuthEnabled, dashboardAuthenticated]);
+
+  useEffect(() => {
     const handlePath = () => {
       const path = window.location.pathname;
       const normalizedAdminPath = adminPath.endsWith('/') ? adminPath.slice(0, -1) : adminPath;
@@ -326,8 +350,22 @@ function App() {
     }
   };
 
+  const isDashboardLocked = dashboardAuthEnabled && !dashboardAuthenticated;
+
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen bg-slate-50 relative">
+      <DashboardPasswordDialog
+        open={isDashboardDialogOpen}
+        onSuccess={() => {
+          sessionStorage.setItem('dashboardAuthed', 'true');
+          setDashboardAuthenticated(true);
+          setIsDashboardDialogOpen(false);
+        }}
+        password={dashboardPassword}
+      />
+      {isDashboardLocked && (
+        <div className="fixed inset-0 z-40 backdrop-blur-xl bg-slate-900/30" aria-hidden="true" />
+      )}
       <AdminPasswordDialog
         open={isAdminDialogOpen}
         onClose={() => {
@@ -343,7 +381,8 @@ function App() {
         }}
         password={adminPassword}
       />
-      {currentView === 'portfolio' && (
+      <div className={isDashboardLocked ? 'blur-xl pointer-events-none select-none' : undefined} aria-hidden={isDashboardLocked}>
+        {currentView === 'portfolio' && (
         <PortfolioOverview
           timePeriod={timePeriod}
           onTimePeriodChange={setTimePeriod}
@@ -515,6 +554,10 @@ function App() {
           onNavigateKeyJourneys={navigateToAllJourneys}
           onNavigateTopPains={navigateToTopPains}
           onTabChange={handleAdminTabChange}
+          dashboardAuthEnabled={dashboardAuthEnabled}
+          dashboardPassword={dashboardPassword}
+          onDashboardAuthEnabledChange={setDashboardAuthEnabled}
+          onDashboardPasswordChange={setDashboardPassword}
           adminAuthEnabled={adminAuthEnabled}
           adminShowButton={adminShowButton}
           adminPassword={adminPassword}
@@ -523,7 +566,7 @@ function App() {
           onAdminPasswordChange={setAdminPassword}
         />
       )}
-      {currentView === 'export-report' && (
+        {currentView === 'export-report' && (
         <ExportReport
           onNavigateBack={navigateBack}
           onNavigateHome={navigateToPortfolio}
@@ -533,6 +576,7 @@ function App() {
           onNavigateAdmin={requestAdminAccess}
         />
       )}
+      </div>
     </div>
   );
 }
