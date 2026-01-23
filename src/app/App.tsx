@@ -17,6 +17,7 @@ import { ManageFeatureFlags } from './components/ManageFeatureFlags';
 import { ExportReport } from './components/ExportReport';
 import { AdminPasswordDialog } from './components/AdminPasswordDialog';
 import { DashboardPasswordDialog } from './components/DashboardPasswordDialog';
+import { supabase } from './lib/supabaseClient';
 import type { TimePeriodData } from './components/TimeSelector';
 
 export type ViewType =
@@ -76,6 +77,16 @@ interface FeatureFlags {
   topPainsEnabled: boolean;
 }
 
+interface AppSettings {
+  adminAuthEnabled: boolean;
+  adminShowButton: boolean;
+  adminPassword: string;
+  dashboardAuthEnabled: boolean;
+  dashboardPassword: string;
+  keyJourneysEnabled: boolean;
+  topPainsEnabled: boolean;
+}
+
 function App() {
   const [currentView, setCurrentView] = useState<ViewType>('portfolio');
   const [selectedApp, setSelectedApp] = useState<string | null>(null);
@@ -97,17 +108,11 @@ function App() {
     format: 'month',
     period: 'November 2025',
   });
-  const [featureFlags, setFeatureFlags] = useState<FeatureFlags>(() => {
-    const defaults: FeatureFlags = { keyJourneysEnabled: false, topPainsEnabled: false };
-    const stored = localStorage.getItem('featureFlags');
-    if (!stored) return defaults;
-    try {
-      const parsed = JSON.parse(stored) as Partial<FeatureFlags>;
-      return { ...defaults, ...parsed };
-    } catch {
-      return defaults;
-    }
+  const [featureFlags, setFeatureFlags] = useState<FeatureFlags>({
+    keyJourneysEnabled: false,
+    topPainsEnabled: false,
   });
+  const [settingsLoaded, setSettingsLoaded] = useState(false);
 
   useEffect(() => {
     document.title = currentView.startsWith('admin')
@@ -116,8 +121,93 @@ function App() {
   }, [currentView]);
 
   useEffect(() => {
-    localStorage.setItem('featureFlags', JSON.stringify(featureFlags));
-  }, [featureFlags]);
+    let isMounted = true;
+    const loadSettings = async () => {
+      const { data, error } = await supabase
+        .from('app_settings')
+        .select('id,admin_auth_enabled,admin_show_button,admin_password,dashboard_auth_enabled,dashboard_password,key_journeys_enabled,top_pains_enabled')
+        .eq('id', 'global')
+        .maybeSingle();
+
+      if (!isMounted) return;
+
+      if (error) {
+        console.warn('Failed to load app settings:', error.message);
+        setSettingsLoaded(true);
+        return;
+      }
+
+      if (!data) {
+        setSettingsLoaded(true);
+        return;
+      }
+
+      const nextSettings: AppSettings = {
+        adminAuthEnabled: data.admin_auth_enabled ?? adminAuthEnabled,
+        adminShowButton: data.admin_show_button ?? adminShowButton,
+        adminPassword: data.admin_password ?? adminPassword,
+        dashboardAuthEnabled: data.dashboard_auth_enabled ?? dashboardAuthEnabled,
+        dashboardPassword: data.dashboard_password ?? dashboardPassword,
+        keyJourneysEnabled: data.key_journeys_enabled ?? featureFlags.keyJourneysEnabled,
+        topPainsEnabled: data.top_pains_enabled ?? featureFlags.topPainsEnabled,
+      };
+
+      localStorage.setItem('adminAuthEnabled', String(nextSettings.adminAuthEnabled));
+      localStorage.setItem('adminShowButton', String(nextSettings.adminShowButton));
+      localStorage.setItem('adminPassword', nextSettings.adminPassword);
+      localStorage.setItem('dashboardAuthEnabled', String(nextSettings.dashboardAuthEnabled));
+      localStorage.setItem('dashboardPassword', nextSettings.dashboardPassword);
+
+      setAdminAuthEnabled(nextSettings.adminAuthEnabled);
+      setAdminShowButton(nextSettings.adminShowButton);
+      setAdminPassword(nextSettings.adminPassword);
+      setDashboardAuthEnabled(nextSettings.dashboardAuthEnabled);
+      setDashboardPassword(nextSettings.dashboardPassword);
+      setFeatureFlags({
+        keyJourneysEnabled: nextSettings.keyJourneysEnabled,
+        topPainsEnabled: nextSettings.topPainsEnabled,
+      });
+      setSettingsLoaded(true);
+    };
+
+    loadSettings();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!settingsLoaded) return;
+    const saveSettings = async () => {
+      const { error } = await supabase
+        .from('app_settings')
+        .upsert({
+          id: 'global',
+          admin_auth_enabled: adminAuthEnabled,
+          admin_show_button: adminShowButton,
+          admin_password: adminPassword,
+          dashboard_auth_enabled: dashboardAuthEnabled,
+          dashboard_password: dashboardPassword,
+          key_journeys_enabled: featureFlags.keyJourneysEnabled,
+          top_pains_enabled: featureFlags.topPainsEnabled,
+        });
+
+      if (error) {
+        console.warn('Failed to save app settings:', error.message);
+      }
+    };
+
+    saveSettings();
+  }, [
+    adminAuthEnabled,
+    adminShowButton,
+    adminPassword,
+    dashboardAuthEnabled,
+    dashboardPassword,
+    featureFlags.keyJourneysEnabled,
+    featureFlags.topPainsEnabled,
+    settingsLoaded,
+  ]);
 
   const pushToHistory = (view: ViewType, appId?: string | null, journeyId?: string | null) => {
     const newState: NavigationState = {
