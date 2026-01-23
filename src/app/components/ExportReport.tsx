@@ -80,6 +80,22 @@ type AppMetricsRow = {
   resolved_metrics_system: string | null;
 };
 
+type ThemeObservationRow = {
+  id: number;
+  theme_id: string | null;
+  percent_of_feedback: number | null;
+  narrative: string | null;
+  bullets: string[] | null;
+  app_id: string | null;
+  period: string | null;
+};
+
+type FeedbackTheme = {
+  category: string;
+  percentage: number;
+  items: string[];
+};
+
 type AppQuarterRow = {
   app_id: string;
   period: string;
@@ -456,6 +472,7 @@ function AppDetailPage({
   topBox,
   quarterLabels,
   isQuarterLoading,
+  monthLabelToCode,
 }: {
   app: any;
   selectedMonth: string;
@@ -463,7 +480,81 @@ function AppDetailPage({
   topBox: { ease: number | null; usefulness: number | null };
   quarterLabels: Array<{ period: string; label: string }>;
   isQuarterLoading: boolean;
+  monthLabelToCode: Record<string, string>;
 }) {
+  const [feedbackThemes, setFeedbackThemes] = useState<FeedbackTheme[]>([]);
+  const [themesLoading, setThemesLoading] = useState(false);
+
+  useEffect(() => {
+    let isMounted = true;
+    const periodCode = monthLabelToCode[selectedMonth] ?? selectedMonth;
+
+    if (!app?.id || !periodCode) {
+      setFeedbackThemes([]);
+      return () => {
+        isMounted = false;
+      };
+    }
+
+    const loadThemes = async () => {
+      setThemesLoading(true);
+      const { data, error } = await supabase
+        .from('pain_observations')
+        .select('id, theme_id, percent_of_feedback, narrative, bullets, app_id, period')
+        .eq('app_id', app.id)
+        .eq('period', periodCode)
+        .order('percent_of_feedback', { ascending: false })
+        .limit(6);
+
+      if (!isMounted) return;
+
+      if (error) {
+        setFeedbackThemes([]);
+        setThemesLoading(false);
+        return;
+      }
+
+      const rows = (Array.isArray(data) ? data : []) as ThemeObservationRow[];
+      const themeIds = rows
+        .map((row) => row.theme_id)
+        .filter((themeId): themeId is string => Boolean(themeId));
+
+      let titleMap: Record<string, string> = {};
+      if (themeIds.length > 0) {
+        const { data: themeRows } = await supabase
+          .from('themes')
+          .select('id,title')
+          .in('id', themeIds);
+
+        if (Array.isArray(themeRows)) {
+          titleMap = themeRows.reduce((acc, row) => {
+            if (row?.id) acc[row.id] = row.title ?? 'Untitled Theme';
+            return acc;
+          }, {} as Record<string, string>);
+        }
+      }
+
+      const mapped = rows.map((row) => {
+        const bullets = Array.isArray(row.bullets) ? row.bullets.filter(Boolean) : [];
+        const items = bullets.length > 0 ? bullets : row.narrative ? [row.narrative] : [];
+        return {
+          category: titleMap[row.theme_id ?? ''] ?? 'Untitled Theme',
+          percentage: row.percent_of_feedback ?? 0,
+          items,
+        };
+      });
+
+      setFeedbackThemes(mapped);
+      setThemesLoading(false);
+    };
+
+    void loadThemes();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [app?.id, monthLabelToCode, selectedMonth]);
+
   const showQuarterLoading = isQuarterLoading && quarterSeries.length === 0;
   const fallbackQuarterLabel = formatQuarterLabel(undefined, undefined) || 'Q4';
   const baseLabels =
@@ -520,45 +611,6 @@ function AppDetailPage({
   const easeOfUseTopBox = topBox.ease;
   const usefulnessTopBox = topBox.usefulness;
 
-  // Mock feedback themes matching the report format
-  const feedbackThemes = [
-    {
-      category: 'System Glitches & Crashes',
-      percentage: 36,
-      items: [
-        'Frequent lock-ups during payment or staging',
-        'Notes fail to update across linked systems',
-        'Refund processes error out requiring IT tickets',
-      ],
-    },
-    {
-      category: 'Limited Integration',
-      percentage: 27,
-      items: [
-        'Cannot combine online SKUs with installs',
-        'No sync between Order Up and Specialty tools',
-        'Delivery address errors delay scheduling',
-      ],
-    },
-    {
-      category: 'Workflow Complexity',
-      percentage: 22,
-      items: [
-        'Multiple steps for basic modifications',
-        'Follow-up tracking lacks completed status option',
-        'No ability to split deliveries efficiently',
-      ],
-    },
-    {
-      category: 'Printing & Access Issues',
-      percentage: 15,
-      items: [
-        'Quotes fail to print to designated printers',
-        'Barcode generation errors for SSN lookups',
-        'Search feature incomplete for product filters',
-      ],
-    },
-  ];
 
   // Chart dimensions - adjusted for tighter fit
   const chartWidth = 320;
@@ -1019,6 +1071,8 @@ export function ExportReport({
       responses: number;
       trend: 'up' | 'down' | 'stable';
       metricsSystem: 'pendo' | 'medallia';
+      isKTLO?: boolean;
+      noUX?: boolean;
     }>
   >([]);
   const [metricsPeriodLabel, setMetricsPeriodLabel] = useState<string | null>(null);
@@ -1148,8 +1202,31 @@ export function ExportReport({
         return;
       }
 
+      const appIds = Array.from(new Set((rows ?? []).map((row: AppMetricsRow) => row.app_id)));
+      let appFlags: Record<string, { isKTLO: boolean; noUX: boolean }> = {};
+
+      if (appIds.length > 0) {
+        const { data: appFlagRows, error: appFlagsError } = await supabase
+          .from('apps')
+          .select('id,is_ktlo,no_ux')
+          .in('id', appIds);
+
+        if (appFlagsError) {
+          console.warn('Failed to load app flags:', appFlagsError.message);
+        } else if (Array.isArray(appFlagRows)) {
+          appFlags = appFlagRows.reduce((acc, row) => {
+            acc[row.id] = {
+              isKTLO: Boolean(row.is_ktlo),
+              noUX: Boolean(row.no_ux),
+            };
+            return acc;
+          }, {} as Record<string, { isKTLO: boolean; noUX: boolean }>);
+        }
+      }
+
       const mappedApps = (rows ?? []).map((row: AppMetricsRow) => {
         const changeValue = Number(row.mom_pct_change ?? 0);
+        const flags = appFlags[row.app_id];
 
         return {
           id: row.app_id,
@@ -1161,6 +1238,8 @@ export function ExportReport({
           responses: row.response_count ?? 0,
           trend: getTrendFromChange(changeValue),
           metricsSystem: normalizeMetricsSystem(row.resolved_metrics_system),
+          isKTLO: flags?.isKTLO ?? false,
+          noUX: flags?.noUX ?? false,
         };
       });
 
@@ -1195,6 +1274,7 @@ export function ExportReport({
     hasInitializedMonth,
     monthLabelToCode,
   ]);
+
 
   useEffect(() => {
     let isMounted = true;
@@ -1905,6 +1985,7 @@ export function ExportReport({
                                 topBox={appTopBox[app.id] ?? { ease: null, usefulness: null }}
                                 quarterLabels={quarterLabels}
                                 isQuarterLoading={isQuarterLoading}
+                                monthLabelToCode={monthLabelToCode}
                               />
                             </div>
                           </div>
@@ -1931,6 +2012,7 @@ export function ExportReport({
                                 topBox={appTopBox[app.id] ?? { ease: null, usefulness: null }}
                                 quarterLabels={quarterLabels}
                                 isQuarterLoading={isQuarterLoading}
+                                monthLabelToCode={monthLabelToCode}
                               />
                             </div>
                           </div>

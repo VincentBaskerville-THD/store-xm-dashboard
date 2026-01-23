@@ -86,6 +86,12 @@ function App() {
     period: 'November 2025',
   });
 
+  useEffect(() => {
+    document.title = currentView.startsWith('admin')
+      ? 'Admin: Manage Dashboard'
+      : 'Store XM Dashboard';
+  }, [currentView]);
+
   const pushToHistory = (view: ViewType, appId?: string | null, journeyId?: string | null) => {
     const newState: NavigationState = {
       view,

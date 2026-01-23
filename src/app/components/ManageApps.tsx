@@ -1,9 +1,9 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Button } from './ui/button';
 import { Card } from './ui/card';
 import { AdminTabNav } from './AdminTabNav';
-import { mockApps } from '../data/mockData';
 import { Save, Search, Settings } from 'lucide-react';
+import { supabase } from '../lib/supabaseClient';
 
 interface ManageAppsProps {
   onNavigateBack: () => void;
@@ -19,6 +19,20 @@ interface AppFlags {
   noUX: boolean;
 }
 
+type AppRow = {
+  id: string;
+  name: string;
+  is_ktlo?: boolean | null;
+  no_ux?: boolean | null;
+};
+
+type MetricsRow = {
+  app_id: string;
+  period: string | null;
+  sort_order: number | null;
+  resolved_metrics_system: string | null;
+};
+
 export function ManageApps({
   onNavigateBack,
   onNavigateHome,
@@ -28,18 +42,16 @@ export function ManageApps({
   onTabChange,
 }: ManageAppsProps) {
   const [searchQuery, setSearchQuery] = useState('');
-  const [appFlags, setAppFlags] = useState<Record<string, AppFlags>>(() => {
-    // Initialize from mockData
-    const flags: Record<string, AppFlags> = {};
-    mockApps.forEach(app => {
-      flags[app.id] = {
-        isKTLO: app.isKTLO || false,
-        noUX: app.noUX || false,
-      };
-    });
-    return flags;
-  });
+  const [apps, setApps] = useState<AppRow[]>([]);
+  const [appFlags, setAppFlags] = useState<Record<string, AppFlags>>({});
+  const [initialFlags, setInitialFlags] = useState<Record<string, AppFlags>>({});
   const [hasChanges, setHasChanges] = useState(false);
+  const [metricsByApp, setMetricsByApp] = useState<Record<string, { months: number; metricsSystem: 'pendo' | 'medallia' | null }>>({});
+  const [themesByApp, setThemesByApp] = useState<Record<string, number>>({});
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   const toggleFlag = (appId: string, flag: 'isKTLO' | 'noUX') => {
     setAppFlags(prev => ({
@@ -53,15 +65,149 @@ export function ManageApps({
   };
 
   const handleSave = () => {
-    // TODO: Save to backend when implemented
-    console.log('Saving app flags:', appFlags);
-    setHasChanges(false);
-    // Show success message
-    alert('App settings saved successfully!');
+    const changedAppIds = Object.keys(appFlags).filter((appId) => {
+      const current = appFlags[appId];
+      const initial = initialFlags[appId];
+      if (!current || !initial) return false;
+      return current.isKTLO !== initial.isKTLO || current.noUX !== initial.noUX;
+    });
+
+    if (changedAppIds.length === 0) {
+      setHasChanges(false);
+      return;
+    }
+
+    setIsSaving(true);
+    setSaveError(null);
+
+    Promise.all(
+      changedAppIds.map((appId) =>
+        supabase
+          .from('apps')
+          .update({
+            is_ktlo: appFlags[appId]?.isKTLO ?? false,
+            no_ux: appFlags[appId]?.noUX ?? false,
+          })
+          .eq('id', appId)
+      )
+    )
+      .then((results) => {
+        const failed = results.find((result) => result.error);
+        if (failed?.error) {
+          throw failed.error;
+        }
+        setInitialFlags({ ...appFlags });
+        setHasChanges(false);
+      })
+      .catch((error) => {
+        setSaveError(error?.message ?? 'Failed to save app flags.');
+      })
+      .finally(() => {
+        setIsSaving(false);
+      });
   };
 
-  const filteredApps = mockApps.filter(app =>
-    app.name.toLowerCase().includes(searchQuery.toLowerCase())
+  useEffect(() => {
+    let isMounted = true;
+
+    const normalizeMetricsSystem = (value: string | null): 'pendo' | 'medallia' => {
+      const normalized = value?.toLowerCase() ?? '';
+      return normalized.includes('medallia') ? 'medallia' : 'pendo';
+    };
+
+    const loadApps = async () => {
+      setIsLoading(true);
+      setLoadError(null);
+
+      const { data: appData, error: appError } = await supabase
+        .from('apps')
+        .select('id,name,is_ktlo,no_ux')
+        .order('name', { ascending: true });
+
+      if (!isMounted) return;
+
+      if (appError) {
+        setLoadError(appError.message);
+        setApps([]);
+        setIsLoading(false);
+        return;
+      }
+
+      const rows = (appData ?? []) as AppRow[];
+      setApps(rows);
+      const nextFlags: Record<string, AppFlags> = {};
+      rows.forEach((app) => {
+        nextFlags[app.id] = {
+          isKTLO: Boolean(app.is_ktlo),
+          noUX: Boolean(app.no_ux),
+        };
+      });
+      setAppFlags(nextFlags);
+      setInitialFlags(nextFlags);
+
+      const { data: metricsData } = await supabase
+        .from('v_app_metrics_trends')
+        .select('app_id, period, sort_order, resolved_metrics_system')
+        .order('sort_order', { ascending: false });
+
+      if (!isMounted) return;
+
+      const metricsRows = (metricsData ?? []) as MetricsRow[];
+      const nextMetrics: Record<string, { months: number; metricsSystem: 'pendo' | 'medallia' | null }> = {};
+      const seenPeriod = new Map<string, Set<string>>();
+      const seenSystem = new Set<string>();
+
+      metricsRows.forEach((row) => {
+        if (!row.app_id) return;
+        const period = row.period ?? '';
+        if (!seenPeriod.has(row.app_id)) {
+          seenPeriod.set(row.app_id, new Set<string>());
+        }
+        if (period && !seenPeriod.get(row.app_id)!.has(period)) {
+          seenPeriod.get(row.app_id)!.add(period);
+        }
+        if (!seenSystem.has(row.app_id)) {
+          nextMetrics[row.app_id] = {
+            months: seenPeriod.get(row.app_id)!.size,
+            metricsSystem: row.resolved_metrics_system ? normalizeMetricsSystem(row.resolved_metrics_system) : null,
+          };
+          seenSystem.add(row.app_id);
+        } else {
+          nextMetrics[row.app_id] = {
+            months: seenPeriod.get(row.app_id)!.size,
+            metricsSystem: nextMetrics[row.app_id]?.metricsSystem ?? null,
+          };
+        }
+      });
+
+      setMetricsByApp(nextMetrics);
+
+      const { data: themeData } = await supabase
+        .from('pain_observations')
+        .select('app_id');
+
+      if (!isMounted) return;
+
+      const themeRows = (themeData ?? []) as Array<{ app_id: string | null }>;
+      const themeCounts: Record<string, number> = {};
+      themeRows.forEach((row) => {
+        if (!row.app_id) return;
+        themeCounts[row.app_id] = (themeCounts[row.app_id] ?? 0) + 1;
+      });
+      setThemesByApp(themeCounts);
+      setIsLoading(false);
+    };
+
+    void loadApps();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  const filteredApps = useMemo(
+    () => apps.filter(app => app.name.toLowerCase().includes(searchQuery.toLowerCase())),
+    [apps, searchQuery]
   );
 
   const navItems = [
@@ -125,15 +271,15 @@ export function ManageApps({
               
               <Button
                 onClick={handleSave}
-                disabled={!hasChanges}
+                disabled={!hasChanges || isSaving}
                 className={`${
-                  hasChanges
+                  hasChanges && !isSaving
                     ? 'bg-orange-600 hover:bg-orange-700 text-white'
                     : 'bg-gray-300 text-gray-500 cursor-not-allowed'
                 }`}
               >
                 <Save size={16} className="mr-2" />
-                Save Changes
+                {isSaving ? 'Saving...' : 'Save Changes'}
               </Button>
             </div>
 
@@ -149,6 +295,19 @@ export function ManageApps({
               />
             </div>
           </div>
+          {loadError && (
+            <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+              Failed to load apps: {loadError}
+            </div>
+          )}
+          {saveError && (
+            <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+              Failed to save app settings: {saveError}
+            </div>
+          )}
+          {isLoading && (
+            <div className="mb-4 text-sm text-slate-600">Loading apps...</div>
+          )}
 
           {/* Apps Table */}
           <div className="border border-gray-200 rounded-lg overflow-hidden">
@@ -159,10 +318,13 @@ export function ManageApps({
                     Application Name
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
-                    Overall Score
+                    Months of Data
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
-                    Metrics System
+                    # of Related Themes
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
+                    Collection Tool
                   </th>
                   <th className="px-6 py-3 text-center text-xs font-medium text-gray-700 uppercase tracking-wider">
                     KTLO
@@ -181,21 +343,22 @@ export function ManageApps({
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div className={`text-sm font-semibold ${
-                        app.overallScore >= 65 ? 'text-green-600' :
-                        app.overallScore >= 50 ? 'text-yellow-600' :
-                        'text-red-600'
-                      }`}>
-                        {app.overallScore}
+                      <div className="text-sm font-semibold text-slate-700">
+                        {metricsByApp[app.id]?.months ?? 0}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm font-semibold text-slate-700">
+                        {themesByApp[app.id] ?? 0}
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                        app.metricsSystem === 'pendo'
+                        (metricsByApp[app.id]?.metricsSystem ?? 'pendo') === 'pendo'
                           ? 'bg-blue-100 text-blue-800'
                           : 'bg-purple-100 text-purple-800'
                       }`}>
-                        {app.metricsSystem === 'pendo' ? 'Pendo' : 'Medallia'}
+                        {(metricsByApp[app.id]?.metricsSystem ?? 'pendo') === 'pendo' ? 'Pendo' : 'Medallia'}
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-center">
@@ -223,7 +386,7 @@ export function ManageApps({
           {/* Summary */}
           <div className="mt-6 flex items-center justify-between text-sm text-gray-600">
             <div>
-              Showing {filteredApps.length} of {mockApps.length} applications
+              Showing {filteredApps.length} of {apps.length} applications
             </div>
             <div className="flex gap-6">
               <div>

@@ -328,7 +328,7 @@ export function ScoreDriversThemes({
                   {/* Context Metadata */}
                   <div className="pt-2 border-t border-slate-100 space-y-1 text-xs text-slate-600">
                     <div><strong>Percentage:</strong> {theme.percentage}% of feedback</div>
-                    {theme.metadata?.monthsActive && (
+                    {theme.metadata?.monthsActive !== undefined && theme.metadata.monthsActive > 0 && (
                       <div><strong>Active:</strong> {theme.metadata.monthsActive} month{theme.metadata.monthsActive !== 1 ? 's' : ''}</div>
                     )}
                     {theme.metadata?.crossAppCount && theme.metadata.crossAppCount > 1 && (

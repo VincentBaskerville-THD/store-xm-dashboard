@@ -7,6 +7,7 @@ import type { TimePeriodData } from './TimeSelector';
 import { TimeSelector } from './TimeSelector';
 import { NavigationHeader } from './NavigationHeader';
 import { mockApps, mockJourneys, markMock } from '../data/mockData';
+// TODO: Replace mock pain data once Top Pains is wired to live data.
 
 interface TopPainsProps {
   timePeriod: TimePeriodData;

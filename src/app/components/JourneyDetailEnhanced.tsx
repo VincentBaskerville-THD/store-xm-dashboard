@@ -4,6 +4,7 @@ import { Button } from './ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Card } from './ui/card';
 import { mockJourneys, mockApps, getScoreColor, getScoreBgColor, getTrendIcon, getTrendColor, markMock } from '../data/mockData';
+// TODO: Replace mock journey detail data once Key Journeys is wired to live data.
 import type { TimePeriod } from '../App';
 import type { TimePeriodData } from './TimeSelector';
 import { TimeSelector } from './TimeSelector';

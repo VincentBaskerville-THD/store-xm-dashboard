@@ -6,7 +6,6 @@ import type { TimePeriodData } from './TimeSelector';
 import { TimeSelector } from './TimeSelector';
 import { ComposedChart, Line, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { ScoreDriversThemes, ThemeCategory } from './ScoreDriversThemes';
-import { markMock } from '../data/mockData';
 import { NavigationHeader } from './NavigationHeader';
 import { supabase } from '../lib/supabaseClient';
 
@@ -39,6 +38,29 @@ type AppMetricsRow = {
   response_count: number | null;
 };
 
+type ThemeObservationRow = {
+  id: number;
+  theme_id: string | null;
+  theme_type: 'positive' | 'negative' | 'neutral' | null;
+  status: string | null;
+  months_active: number | null;
+  percent_of_feedback: number | null;
+  narrative: string | null;
+  bullets: string[] | null;
+};
+
+type ThemeStatus = 'unresolved' | 'improving' | 'stabilized' | 'resolved-monitoring';
+
+const normalizeStatus = (value?: string | null): ThemeStatus | undefined => {
+  if (!value) return undefined;
+  if (value === 'resolved_monitoring') return 'resolved-monitoring';
+  if (value === 'resolved-monitoring') return 'resolved-monitoring';
+  if (value === 'unresolved' || value === 'improving' || value === 'stabilized') {
+    return value;
+  }
+  return undefined;
+};
+
 export function AppDetailEnhanced({
   appId,
   timePeriod,
@@ -57,6 +79,12 @@ export function AppDetailEnhanced({
   const [appName, setAppName] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [metricsError, setMetricsError] = useState<string | null>(null);
+  const [themeRows, setThemeRows] = useState<ThemeObservationRow[]>([]);
+  const [themesLoading, setThemesLoading] = useState(false);
+  const [themesError, setThemesError] = useState<string | null>(null);
+  const [themeCatalog, setThemeCatalog] = useState<Record<string, { title: string; defaultType?: 'positive' | 'negative' | 'neutral' }>>({});
+  const [themesAppId, setThemesAppId] = useState<string | null>(null);
+  const [fiscalPeriods, setFiscalPeriods] = useState<Array<{ period: string; label: string; sort_order: number }>>([]);
 
   const getLabel = (row: AppMetricsRow) => row.period_label ?? row.period;
 
@@ -126,11 +154,166 @@ export function AppDetailEnhanced({
     };
   }, [appId, onTimePeriodChange, timePeriod.format, timePeriod.period]);
 
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadFiscalPeriods = async () => {
+      const { data, error } = await supabase
+        .from('fiscal_periods')
+        .select('period,label,sort_order')
+        .order('sort_order', { ascending: true });
+
+      if (!isMounted) return;
+
+      if (error) {
+        setFiscalPeriods([]);
+        return;
+      }
+
+      setFiscalPeriods((data ?? []) as Array<{ period: string; label: string; sort_order: number }>);
+    };
+
+    void loadFiscalPeriods();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const resolveThemesAppId = async () => {
+      if (!appName) {
+        setThemesAppId(null);
+        return;
+      }
+
+      const { data, error } = await supabase
+        .from('apps')
+        .select('id')
+        .ilike('name', appName)
+        .limit(1)
+        .maybeSingle();
+
+      if (!isMounted) return;
+
+      if (error) {
+        setThemesAppId(null);
+        return;
+      }
+
+      setThemesAppId(data?.id ?? null);
+    };
+
+    void resolveThemesAppId();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [appName]);
+
   const currentPeriodData = useMemo(() => {
     // Pick the selected period's row (fallback to latest if not found).
     if (appSeries.length === 0) return null;
     return appSeries.find((row) => getLabel(row) === timePeriod.period) ?? appSeries[appSeries.length - 1];
   }, [appSeries, timePeriod.period]);
+
+  const periodCodeToQuery = useMemo(() => {
+    const label = timePeriod.period;
+    const periodFromRow = currentPeriodData?.period;
+
+    if (periodFromRow && periodFromRow.startsWith('FY')) {
+      return periodFromRow;
+    }
+
+    const match = fiscalPeriods.find((period) =>
+      period.label === label || period.label === currentPeriodData?.period_label
+    );
+
+    return match?.period ?? periodFromRow ?? label ?? null;
+  }, [currentPeriodData?.period, currentPeriodData?.period_label, fiscalPeriods, timePeriod.period]);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadThemes = async () => {
+      const appIdToQuery = themesAppId ?? appId;
+
+      if (!periodCodeToQuery || !appIdToQuery) {
+        setThemeRows([]);
+        return;
+      }
+
+      setThemesLoading(true);
+      setThemesError(null);
+
+      const { data, error } = await supabase
+        .from('pain_observations')
+        .select(
+          [
+            'id',
+            'theme_id',
+            'theme_type',
+            'status',
+            'months_active',
+            'percent_of_feedback',
+            'narrative',
+            'bullets',
+          ].join(',')
+        )
+        .eq('app_id', appIdToQuery)
+        .eq('period', periodCodeToQuery)
+        .order('percent_of_feedback', { ascending: false })
+        .limit(50);
+
+      if (!isMounted) return;
+
+      if (error) {
+        setThemesError(error.message);
+        setThemeRows([]);
+        setThemesLoading(false);
+        return;
+      }
+
+      const rows = Array.isArray(data)
+        ? (data as unknown as ThemeObservationRow[])
+        : [];
+      setThemeRows(rows);
+      const themeIds = rows
+        .map((row) => row.theme_id)
+        .filter((themeId): themeId is string => Boolean(themeId));
+
+      if (themeIds.length > 0) {
+        const { data: themeData, error: themeError } = await supabase
+          .from('themes')
+          .select('id,title,default_type')
+          .in('id', themeIds);
+
+        if (!themeError && Array.isArray(themeData)) {
+          const catalog = themeData.reduce((acc, theme) => {
+            if (theme?.id) {
+              acc[theme.id] = {
+                title: theme.title ?? 'Untitled Theme',
+                defaultType: theme.default_type ?? undefined,
+              };
+            }
+            return acc;
+          }, {} as Record<string, { title: string; defaultType?: 'positive' | 'negative' | 'neutral' }>);
+          setThemeCatalog(catalog);
+        }
+    } else {
+        setThemeCatalog({});
+      }
+      setThemesLoading(false);
+    };
+
+    void loadThemes();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [appId, periodCodeToQuery, themesAppId]);
 
   const chartData = useMemo(() => {
     // Convert rows into chart-ready shape; top/bottom boxes are averaged across drivers.
@@ -158,15 +341,8 @@ export function AppDetailEnhanced({
     });
   }, [appSeries]);
 
-  const headerSubtitle = timePeriod.period;
-
-  if (!isLoading && metricsError) {
-    return <div className="p-6 text-slate-600">Supabase error: {metricsError}</div>;
-  }
-
-  if (!isLoading && !currentPeriodData) {
-    return <div className="p-6 text-slate-600">No data found for this app.</div>;
-  }
+  const headerSubtitle = timePeriod.period || 'Period';
+  const headerSubtitleUpper = headerSubtitle.toUpperCase();
 
   // Feed the TimeSelector only periods valid for the current format.
   const availablePeriodsByFormat: Partial<Record<TimePeriodData['format'], string[]>> = {
@@ -209,84 +385,42 @@ export function AppDetailEnhanced({
     return p;
   });
 
-  // Feedback themes matching the report format
-  const feedbackThemes: ThemeCategory[] = [
-    {
-      title: markMock('Receipt Lookup & Card Swipe Errors'),
-      percentage: 21,
-      type: 'negative',
-      narratives: [
-        'ApplePay and credit card lookups often return errors, forcing fallback to manual search.',
-        'Card swipe and tap-to-pay receipt lookup frequently fails or times out across registers.',
-      ],
+  const feedbackThemes = useMemo<ThemeCategory[]>(() => {
+    if (themeRows.length === 0) return [];
+
+    return themeRows.map((row) => {
+      const themeInfo = row.theme_id ? themeCatalog[row.theme_id] : undefined;
+      const bullets = Array.isArray(row.bullets) ? row.bullets.filter(Boolean) : [];
+      const narratives = bullets.length > 0
+        ? bullets
+        : row.narrative
+          ? [row.narrative]
+          : [];
+
+      return {
+        title: themeInfo?.title ?? 'Untitled Theme',
+        percentage: row.percent_of_feedback ?? 0,
+        type: row.theme_type ?? themeInfo?.defaultType ?? 'negative',
+        narratives,
       metadata: {
-        monthsActive: 9,
-        trendDirection: 'stable',
-        crossAppCount: 3,
-        status: 'unresolved',
-      },
-      exampleComments: [
-        { text: 'The card reader never works on the first try, always have to manually type everything', date: 'Nov 12, 2025', userRole: 'Store Associate', rating: 2 },
-        { text: 'ApplePay lookups fail about 50% of the time, very frustrating for customers', date: 'Nov 8, 2025', userRole: 'Cashier', rating: 1 },
-        { text: 'Receipt lookup by card swipe times out constantly during busy hours', date: 'Nov 5, 2025', userRole: 'Customer Service', rating: 2 },
-      ],
-    },
-    {
-      title: markMock('System Errors & Performance'),
-      percentage: 11,
-      type: 'negative',
-      narratives: [
-        'Recurring "Something went wrong" and "Whoops" messages block item scanning and return completion.',
-        'Performance degrades during large returns; system slows significantly and may freeze.',
-      ],
-      metadata: {
-        monthsActive: 6,
-        trendDirection: 'increasing',
-        trendPercentage: 15,
-        status: 'unresolved',
-      },
-      exampleComments: [
-        { text: 'Getting "Whoops" errors multiple times per shift now, never used to happen', date: 'Nov 14, 2025', userRole: 'Returns Desk', rating: 1 },
-        { text: 'System froze completely during a big return yesterday, had to restart', date: 'Nov 10, 2025', userRole: 'Store Associate', rating: 1 },
-      ],
-    },
-    {
-      title: markMock('Even Exchange & RTV Issues'),
-      percentage: 7,
-      type: 'negative',
-      narratives: [
-        'Even exchanges with protection plans cannot be processed in OneReturns; associates revert to standalone returns.',
-        'Damaged barcodes prevent RTV processing; system does not allow manual SKU entry.',
-      ],
-      metadata: {
-        monthsActive: 3,
-        trendDirection: 'stable',
-        status: 'improving',
-      },
-      exampleComments: [
-        { text: 'Cannot process even exchanges with protection plans, have to do it the old way', date: 'Nov 9, 2025', userRole: 'Customer Service', rating: 2 },
-      ],
-    },
-    {
-      title: markMock('Improved Speed & Reliability'),
-      percentage: 18,
-      type: 'positive',
-      narratives: [
-        'Recent updates have significantly improved load times and system responsiveness.',
-        'Fewer crashes and errors compared to earlier quarters.',
-      ],
-      metadata: {
-        isNew: true,
-        trendDirection: 'increasing',
-        trendPercentage: 25,
-        status: 'stabilized',
-      },
-      exampleComments: [
-        { text: 'System is much faster now, really notice the difference from last month', date: 'Nov 15, 2025', userRole: 'Store Manager', rating: 5 },
-        { text: 'Love the speed improvements, makes returns go so much quicker', date: 'Nov 13, 2025', userRole: 'Cashier', rating: 5 },
-      ],
-    },
-  ];
+          monthsActive: row.months_active ?? undefined,
+          status: normalizeStatus(row.status),
+        },
+      };
+    });
+  }, [themeRows, themeCatalog]);
+
+  if (isLoading) {
+    return <div className="p-6 text-slate-600">Loading app details...</div>;
+  }
+
+  if (!isLoading && metricsError) {
+    return <div className="p-6 text-slate-600">Supabase error: {metricsError}</div>;
+  }
+
+  if (!isLoading && !currentPeriodData) {
+    return <div className="p-6 text-slate-600">No data found for this app.</div>;
+  }
 
   return (
     <div className="min-h-screen bg-white">
@@ -504,12 +638,25 @@ export function AppDetailEnhanced({
 
         {/* Feedback Themes using reusable component */}
         <section className="mb-8">
+          {themesError && (
+            <div className="mb-4 rounded border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+              Failed to load themes for this period: {themesError}
+            </div>
+          )}
+          {themesLoading && (
+            <div className="mb-4 text-sm text-slate-600">Loading feedback themes...</div>
+          )}
           <ScoreDriversThemes 
             themes={feedbackThemes} 
             density="standard"
-            title={`${headerSubtitle.toUpperCase()} FEEDBACK THEMES`}
+            title={`${headerSubtitleUpper} FEEDBACK THEMES`}
             subtitle="AI Supported Summary"
           />
+          {!themesLoading && !themesError && feedbackThemes.length === 0 && (
+            <div className="mt-4 rounded border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+              No feedback themes found for this app and period yet.
+            </div>
+          )}
         </section>
       </div>
     </div>
