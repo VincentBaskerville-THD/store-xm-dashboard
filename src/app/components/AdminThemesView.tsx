@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Card } from './ui/card';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -7,7 +7,7 @@ import { Textarea } from './ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { X, Plus, Save, Eye, Search, AlertCircle, FileText } from 'lucide-react';
 import type { ThemeCategory } from './ScoreDriversThemes';
-import { mockApps, mockJourneys } from '../data/mockData';
+import { mockApps, mockJourneys, markMock } from '../data/mockData';
 import { AdminThemesPreview } from './AdminThemesPreview';
 import { AdminTabNav } from './AdminTabNav';
 
@@ -17,7 +17,7 @@ interface AdminThemesViewProps {
   onNavigateAllApps: () => void;
   onNavigateKeyJourneys: () => void;
   onNavigateTopPains: () => void;
-  onTabChange: (tab: 'submit' | 'manage-themes' | 'manage-journeys' | 'manage-apps' | 'settings') => void;
+  onTabChange: (tab: 'manage-themes' | 'manage-journeys' | 'manage-apps' | 'settings') => void;
 }
 
 interface ExistingTheme {
@@ -58,7 +58,7 @@ interface ThemeFormData {
 // Mock existing themes for preview context (simulating what already exists in the system)
 const mockContextThemes: ThemeFormData[] = [
   {
-    title: 'Slow Performance',
+    title: markMock('Slow Performance'),
     percentage: 22,
     type: 'negative',
     descriptionBullets: ['App takes too long to load', 'Frequent lag during peak hours'],
@@ -72,7 +72,7 @@ const mockContextThemes: ThemeFormData[] = [
     manualOverrides: {},
   },
   {
-    title: 'Helpful Notifications',
+    title: markMock('Helpful Notifications'),
     percentage: 18,
     type: 'positive',
     descriptionBullets: ['Timely alerts keep me informed', 'Notifications are relevant and not overwhelming'],
@@ -89,13 +89,13 @@ const mockContextThemes: ThemeFormData[] = [
 
 // Mock existing themes for search
 const mockExistingThemes: ExistingTheme[] = [
-  { title: 'Navigation Confusion', appId: '3', appName: 'Order Up', percentage: 28, type: 'negative', monthsActive: 3, trendDirection: 'increasing', trendPercentage: 5, crossAppCount: 1, isNew: false },
-  { title: 'Navigation Confusion', appId: '14', appName: 'Sidekick', percentage: 35, type: 'negative', monthsActive: 6, trendDirection: 'stable', trendPercentage: 0, crossAppCount: 2, isNew: false },
-  { title: 'Slow Performance', appId: '3', appName: 'Order Up', percentage: 22, type: 'negative', monthsActive: 5, trendDirection: 'decreasing', trendPercentage: -3, crossAppCount: 4, isNew: false },
-  { title: 'Login Issues', appId: '14', appName: 'Sidekick', percentage: 18, type: 'negative', monthsActive: 2, trendDirection: 'increasing', trendPercentage: 8, crossAppCount: 1, isNew: true },
-  { title: 'Intuitive Design', appId: '2', appName: 'My View', percentage: 42, type: 'positive', monthsActive: 12, trendDirection: 'stable', trendPercentage: 1, crossAppCount: 1, isNew: false },
-  { title: 'Search Functionality', appId: '5', appName: 'Specialty Project tool', percentage: 25, type: 'negative', monthsActive: 4, trendDirection: 'stable', trendPercentage: 0, crossAppCount: 3, isNew: false },
-  { title: 'Search Functionality', appId: '3', appName: 'Order Up', percentage: 19, type: 'negative', monthsActive: 2, trendDirection: 'increasing', trendPercentage: 6, crossAppCount: 3, isNew: false },
+  { title: markMock('Navigation Confusion'), appId: '3', appName: markMock('Order Up'), percentage: 28, type: 'negative', monthsActive: 3, trendDirection: 'increasing', trendPercentage: 5, crossAppCount: 1, isNew: false },
+  { title: markMock('Navigation Confusion'), appId: '14', appName: markMock('Sidekick'), percentage: 35, type: 'negative', monthsActive: 6, trendDirection: 'stable', trendPercentage: 0, crossAppCount: 2, isNew: false },
+  { title: markMock('Slow Performance'), appId: '3', appName: markMock('Order Up'), percentage: 22, type: 'negative', monthsActive: 5, trendDirection: 'decreasing', trendPercentage: -3, crossAppCount: 4, isNew: false },
+  { title: markMock('Login Issues'), appId: '14', appName: markMock('Sidekick'), percentage: 18, type: 'negative', monthsActive: 2, trendDirection: 'increasing', trendPercentage: 8, crossAppCount: 1, isNew: true },
+  { title: markMock('Intuitive Design'), appId: '2', appName: markMock('My View'), percentage: 42, type: 'positive', monthsActive: 12, trendDirection: 'stable', trendPercentage: 1, crossAppCount: 1, isNew: false },
+  { title: markMock('Search Functionality'), appId: '5', appName: markMock('Specialty Project tool'), percentage: 25, type: 'negative', monthsActive: 4, trendDirection: 'stable', trendPercentage: 0, crossAppCount: 3, isNew: false },
+  { title: markMock('Search Functionality'), appId: '3', appName: markMock('Order Up'), percentage: 19, type: 'negative', monthsActive: 2, trendDirection: 'increasing', trendPercentage: 6, crossAppCount: 3, isNew: false },
 ];
 
 const emptyTheme: ThemeFormData = {
@@ -318,8 +318,7 @@ export function AdminThemesView({
     setShowPreview(true);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = () => {
     
     // Validate form
     const isValid = themes.every(theme => 
@@ -430,7 +429,7 @@ export function AdminThemesView({
       </header>
 
       {/* Admin Tabs */}
-      <AdminTabNav activeTab="submit" onTabChange={onTabChange} />
+      <AdminTabNav activeTab="manage-themes" onTabChange={onTabChange} />
 
       {/* Main Content */}
       <main className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8">
@@ -600,7 +599,7 @@ export function AdminThemesView({
                       <Label htmlFor={`title-${themeIndex}`}>
                         Theme Title <span className="text-red-600">*</span>
                       </Label>
-                      <div className="relative" ref={el => themeSearchRefs.current[themeIndex] = el}>
+                      <div className="relative" ref={(el) => { themeSearchRefs.current[themeIndex] = el; }}>
                         <div className="relative">
                           <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-slate-400" />
                           <Input
@@ -727,7 +726,7 @@ export function AdminThemesView({
                         <Label htmlFor={`monthsActive-${themeIndex}`} className="text-sm flex items-center gap-1">
                           Months Active
                           {theme.manualOverrides.monthsActive && (
-                            <AlertCircle className="size-3 text-amber-600" title="Manually edited" />
+                            <AlertCircle className="size-3 text-amber-600" />
                           )}
                         </Label>
                         <Input
@@ -744,7 +743,7 @@ export function AdminThemesView({
                         <Label htmlFor={`trendDirection-${themeIndex}`} className="text-sm flex items-center gap-1">
                           Trend
                           {theme.manualOverrides.trendDirection && (
-                            <AlertCircle className="size-3 text-amber-600" title="Manually edited" />
+                            <AlertCircle className="size-3 text-amber-600" />
                           )}
                         </Label>
                         <Select 
@@ -766,7 +765,7 @@ export function AdminThemesView({
                         <Label htmlFor={`trendPercentage-${themeIndex}`} className="text-sm flex items-center gap-1">
                           Trend %
                           {theme.manualOverrides.trendPercentage && (
-                            <AlertCircle className="size-3 text-amber-600" title="Manually edited" />
+                            <AlertCircle className="size-3 text-amber-600" />
                           )}
                         </Label>
                         <Input
@@ -782,7 +781,7 @@ export function AdminThemesView({
                         <Label htmlFor={`crossAppCount-${themeIndex}`} className="text-sm flex items-center gap-1">
                           Cross-App Count
                           {theme.manualOverrides.crossAppCount && (
-                            <AlertCircle className="size-3 text-amber-600" title="Manually edited" />
+                            <AlertCircle className="size-3 text-amber-600" />
                           )}
                         </Label>
                         <Input
@@ -807,7 +806,7 @@ export function AdminThemesView({
                       <Label htmlFor={`isNew-${themeIndex}`} className="cursor-pointer text-sm flex items-center gap-1">
                         Mark as new/emerging pattern
                         {theme.manualOverrides.isNew && (
-                          <AlertCircle className="size-3 text-amber-600" title="Manually edited" />
+                          <AlertCircle className="size-3 text-amber-600" />
                         )}
                       </Label>
                     </div>

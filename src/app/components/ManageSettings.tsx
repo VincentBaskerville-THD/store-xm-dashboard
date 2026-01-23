@@ -1,10 +1,11 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { Button } from './ui/button';
 import { Card } from './ui/card';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { AdminTabNav } from './AdminTabNav';
 import { Save, AlertCircle, CheckCircle2, Eye, EyeOff, Lock } from 'lucide-react';
+import { Switch } from './ui/switch';
 
 interface ManageSettingsProps {
   onNavigateBack: () => void;
@@ -13,10 +14,13 @@ interface ManageSettingsProps {
   onNavigateKeyJourneys?: () => void;
   onNavigateTopPains?: () => void;
   onTabChange: (tab: 'manage-themes' | 'manage-journeys' | 'manage-apps' | 'settings') => void;
+  adminAuthEnabled: boolean;
+  adminShowButton: boolean;
+  adminPassword: string;
+  onAdminAuthEnabledChange: (enabled: boolean) => void;
+  onAdminShowButtonChange: (enabled: boolean) => void;
+  onAdminPasswordChange: (password: string) => void;
 }
-
-// This would be stored in a backend/database in production
-const CURRENT_PASSWORD = 'happyness';
 
 export function ManageSettings({
   onNavigateBack,
@@ -25,6 +29,12 @@ export function ManageSettings({
   onNavigateKeyJourneys,
   onNavigateTopPains,
   onTabChange,
+  adminAuthEnabled,
+  adminShowButton,
+  adminPassword,
+  onAdminAuthEnabledChange,
+  onAdminShowButtonChange,
+  onAdminPasswordChange,
 }: ManageSettingsProps) {
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -41,7 +51,7 @@ export function ManageSettings({
     setSuccess('');
 
     // Validate current password
-    if (currentPassword !== CURRENT_PASSWORD) {
+    if (currentPassword !== adminPassword) {
       setError('Current password is incorrect');
       return;
     }
@@ -59,13 +69,13 @@ export function ManageSettings({
     }
 
     // Validate new password is different
-    if (newPassword === CURRENT_PASSWORD) {
+    if (newPassword === adminPassword) {
       setError('New password must be different from current password');
       return;
     }
 
     // TODO: Save to backend when implemented
-    console.log('Updating password to:', newPassword);
+    onAdminPasswordChange(newPassword);
     
     setSuccess('Password updated successfully!');
     setCurrentPassword('');
@@ -139,6 +149,23 @@ export function ManageSettings({
             <p className="text-sm text-gray-600 mt-1">
               Update the admin password to access the admin panel
             </p>
+          </div>
+
+          <div className="mb-6 grid gap-4 md:grid-cols-2">
+            <div className="flex items-center justify-between rounded-lg border border-slate-200 p-4">
+              <div>
+                <p className="font-medium text-slate-900">Require admin password</p>
+                <p className="text-sm text-slate-600">Show the password prompt before accessing admin.</p>
+              </div>
+              <Switch checked={adminAuthEnabled} onCheckedChange={onAdminAuthEnabledChange} />
+            </div>
+            <div className="flex items-center justify-between rounded-lg border border-slate-200 p-4">
+              <div>
+                <p className="font-medium text-slate-900">Show admin shortcut button</p>
+                <p className="text-sm text-slate-600">Toggle the 👀 button in the top header.</p>
+              </div>
+              <Switch checked={adminShowButton} onCheckedChange={onAdminShowButtonChange} />
+            </div>
           </div>
 
           {/* Success Message */}

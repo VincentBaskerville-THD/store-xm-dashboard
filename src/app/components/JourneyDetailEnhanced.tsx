@@ -3,7 +3,7 @@ import { ArrowLeft, FileDown, ChevronLeft, ChevronRight, ExternalLink, ArrowRigh
 import { Button } from './ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Card } from './ui/card';
-import { mockJourneys, mockApps, getScoreColor, getScoreBgColor, getTrendIcon, getTrendColor } from '../data/mockData';
+import { mockJourneys, mockApps, getScoreColor, getScoreBgColor, getTrendIcon, getTrendColor, markMock } from '../data/mockData';
 import type { TimePeriod } from '../App';
 import type { TimePeriodData } from './TimeSelector';
 import { TimeSelector } from './TimeSelector';
@@ -217,25 +217,25 @@ export function JourneyDetailEnhanced({
 
   // Contributing apps
   const contributingApps = [
-    { appId: '1', appName: '1Returns', score: 79, prevScore: 75, touchpoints: 3, description: 'Primary returns processing', color: 'blue' },
-    { appId: '5', appName: 'Inventory Manager', score: 81, prevScore: 78, touchpoints: 2, description: 'Stock verification', color: 'green' },
-    { appId: '3', appName: 'Order Up', score: 66, prevScore: 63, touchpoints: 2, description: 'Refund processing', color: 'purple' },
-    { appId: '6', appName: 'Customer Portal', score: 68, prevScore: 65, touchpoints: 1, description: 'Customer record updates', color: 'amber' },
+    { appId: '1', appName: markMock('1Returns'), score: 79, prevScore: 75, touchpoints: 3, description: markMock('Primary returns processing'), color: 'blue' },
+    { appId: '5', appName: markMock('Inventory Manager'), score: 81, prevScore: 78, touchpoints: 2, description: markMock('Stock verification'), color: 'green' },
+    { appId: '3', appName: markMock('Order Up'), score: 66, prevScore: 63, touchpoints: 2, description: markMock('Refund processing'), color: 'purple' },
+    { appId: '6', appName: markMock('Customer Portal'), score: 68, prevScore: 65, touchpoints: 1, description: markMock('Customer record updates'), color: 'amber' },
     // Apps without scores (not being tracked)
-    { appId: '12', appName: 'Shipping Manager', score: null, prevScore: null, touchpoints: 1, description: 'Shipping label generation and tracking', color: 'cyan' },
-    { appId: '8', appName: 'Fulfillment Hub', score: null, prevScore: null, touchpoints: 1, description: 'Warehouse receipt confirmation', color: 'indigo' },
+    { appId: '12', appName: markMock('Shipping Manager'), score: null, prevScore: null, touchpoints: 1, description: markMock('Shipping label generation and tracking'), color: 'cyan' },
+    { appId: '8', appName: markMock('Fulfillment Hub'), score: null, prevScore: null, touchpoints: 1, description: markMock('Warehouse receipt confirmation'), color: 'indigo' },
   ];
 
   // Touchpoint breakdown - scores only exist if the app is being tracked
   const touchpointData = [
-    { step: 1, touchpoint: 'Initiate Return', app: '1Returns', score: 82, prevScore: 78, appId: '1', color: 'blue', description: 'Customer starts return process through online portal' },
-    { step: 2, touchpoint: 'Verify Eligibility', app: '1Returns', score: 79, prevScore: 75, appId: '1', color: 'blue', description: 'System checks if product qualifies for return based on policy' },
-    { step: 3, touchpoint: 'Process Refund', app: 'Order Up', score: 71, prevScore: 68, appId: '3', color: 'purple', description: 'Refund amount is calculated and initiated' },
-    { step: 4, touchpoint: 'Update Customer Record', app: 'Customer Portal', score: 68, prevScore: 65, appId: '6', color: 'amber', description: 'Customer account is updated with return transaction details' },
-    { step: 5, touchpoint: 'Generate Return Label', app: '1Returns', score: 79, prevScore: 76, appId: '1', color: 'blue', description: 'Shipping label is created and sent to customer' },
-    { step: 6, touchpoint: 'Track Return Shipment', app: 'Shipping Manager', score: null, prevScore: null, appId: '12', color: 'cyan', description: 'Package location is monitored during transit' },
-    { step: 7, touchpoint: 'Confirm Receipt', app: 'Fulfillment Hub', score: null, prevScore: null, appId: '8', color: 'indigo', description: 'Returned item arrives at warehouse and is logged' },
-    { step: 8, touchpoint: 'Close Return Case', app: '1Returns', score: 77, prevScore: 74, appId: '1', color: 'blue', description: 'Return transaction is finalized and closed' },
+    { step: 1, touchpoint: markMock('Initiate Return'), app: markMock('1Returns'), score: 82, prevScore: 78, appId: '1', color: 'blue', description: markMock('Customer starts return process through online portal') },
+    { step: 2, touchpoint: markMock('Verify Eligibility'), app: markMock('1Returns'), score: 79, prevScore: 75, appId: '1', color: 'blue', description: markMock('System checks if product qualifies for return based on policy') },
+    { step: 3, touchpoint: markMock('Process Refund'), app: markMock('Order Up'), score: 71, prevScore: 68, appId: '3', color: 'purple', description: markMock('Refund amount is calculated and initiated') },
+    { step: 4, touchpoint: markMock('Update Customer Record'), app: markMock('Customer Portal'), score: 68, prevScore: 65, appId: '6', color: 'amber', description: markMock('Customer account is updated with return transaction details') },
+    { step: 5, touchpoint: markMock('Generate Return Label'), app: markMock('1Returns'), score: 79, prevScore: 76, appId: '1', color: 'blue', description: markMock('Shipping label is created and sent to customer') },
+    { step: 6, touchpoint: markMock('Track Return Shipment'), app: markMock('Shipping Manager'), score: null, prevScore: null, appId: '12', color: 'cyan', description: markMock('Package location is monitored during transit') },
+    { step: 7, touchpoint: markMock('Confirm Receipt'), app: markMock('Fulfillment Hub'), score: null, prevScore: null, appId: '8', color: 'indigo', description: markMock('Returned item arrives at warehouse and is logged') },
+    { step: 8, touchpoint: markMock('Close Return Case'), app: markMock('1Returns'), score: 77, prevScore: 74, appId: '1', color: 'blue', description: markMock('Return transaction is finalized and closed') },
   ];
 
   // Helper function to get border color class based on app color
@@ -278,12 +278,12 @@ export function JourneyDetailEnhanced({
   // Journey-specific feedback themes
   const feedbackThemes: ThemeCategory[] = [
     {
-      title: 'Transition Delays Between Apps',
+      title: markMock('Transition Delays Between Apps'),
       percentage: 28,
       type: 'negative',
       narratives: [
-        'Switching from 1Returns to Order Up for refund processing takes 30-45 seconds on average.',
-        'Customer Portal updates require manual data re-entry from returns system.',
+        markMock('Switching from 1Returns to Order Up for refund processing takes 30-45 seconds on average.'),
+        markMock('Customer Portal updates require manual data re-entry from returns system.'),
       ],
       metadata: {
         monthsActive: 8,
@@ -292,17 +292,17 @@ export function JourneyDetailEnhanced({
         status: 'unresolved',
       },
       exampleComments: [
-        { text: 'The wait time between systems is frustrating, especially when the customer is standing there', date: 'Nov 12, 2025', userRole: 'Store Associate', rating: 2 },
-        { text: 'Why do I have to type the same information into three different screens?', date: 'Nov 8, 2025', userRole: 'Customer Service', rating: 2 },
+        { text: markMock('The wait time between systems is frustrating, especially when the customer is standing there'), date: 'Nov 12, 2025', userRole: 'Store Associate', rating: 2 },
+        { text: markMock('Why do I have to type the same information into three different screens?'), date: 'Nov 8, 2025', userRole: 'Customer Service', rating: 2 },
       ],
     },
     {
-      title: 'Refund Processing Bottleneck',
+      title: markMock('Refund Processing Bottleneck'),
       percentage: 19,
       type: 'negative',
       narratives: [
-        'Order Up refund step scores below journey average, causing delays.',
-        'System often requires manager approval for standard returns that should be automatic.',
+        markMock('Order Up refund step scores below journey average, causing delays.'),
+        markMock('System often requires manager approval for standard returns that should be automatic.'),
       ],
       metadata: {
         monthsActive: 5,
@@ -312,12 +312,12 @@ export function JourneyDetailEnhanced({
       },
     },
     {
-      title: 'Smooth Initiation Experience',
+      title: markMock('Smooth Initiation Experience'),
       percentage: 24,
       type: 'positive',
       narratives: [
-        '1Returns initiation step rated highly for ease of use and speed.',
-        'Receipt lookup generally works well at the start of the journey.',
+        markMock('1Returns initiation step rated highly for ease of use and speed.'),
+        markMock('Receipt lookup generally works well at the start of the journey.'),
       ],
       metadata: {
         trendDirection: 'stable',

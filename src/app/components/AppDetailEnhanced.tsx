@@ -6,6 +6,7 @@ import type { TimePeriodData } from './TimeSelector';
 import { TimeSelector } from './TimeSelector';
 import { ComposedChart, Line, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { ScoreDriversThemes, ThemeCategory } from './ScoreDriversThemes';
+import { markMock } from '../data/mockData';
 import { NavigationHeader } from './NavigationHeader';
 import { supabase } from '../lib/supabaseClient';
 
@@ -211,7 +212,7 @@ export function AppDetailEnhanced({
   // Feedback themes matching the report format
   const feedbackThemes: ThemeCategory[] = [
     {
-      title: 'Receipt Lookup & Card Swipe Errors',
+      title: markMock('Receipt Lookup & Card Swipe Errors'),
       percentage: 21,
       type: 'negative',
       narratives: [
@@ -231,7 +232,7 @@ export function AppDetailEnhanced({
       ],
     },
     {
-      title: 'System Errors & Performance',
+      title: markMock('System Errors & Performance'),
       percentage: 11,
       type: 'negative',
       narratives: [
@@ -250,7 +251,7 @@ export function AppDetailEnhanced({
       ],
     },
     {
-      title: 'Even Exchange & RTV Issues',
+      title: markMock('Even Exchange & RTV Issues'),
       percentage: 7,
       type: 'negative',
       narratives: [
@@ -267,7 +268,7 @@ export function AppDetailEnhanced({
       ],
     },
     {
-      title: 'Improved Speed & Reliability',
+      title: markMock('Improved Speed & Reliability'),
       percentage: 18,
       type: 'positive',
       narratives: [

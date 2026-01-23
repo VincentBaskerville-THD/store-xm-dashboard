@@ -6,7 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import type { TimePeriodData } from './TimeSelector';
 import { TimeSelector } from './TimeSelector';
 import { NavigationHeader } from './NavigationHeader';
-import { mockApps, mockJourneys } from '../data/mockData';
+import { mockApps, mockJourneys, markMock } from '../data/mockData';
 
 interface TopPainsProps {
   timePeriod: TimePeriodData;
@@ -1076,7 +1076,7 @@ export function TopPains({
                               'text-yellow-600'
                             }`} />
                             <span className="text-sm font-semibold text-slate-900 flex-1 truncate group-hover:text-slate-700">
-                              {pain.title}
+                              {markMock(pain.title)}
                             </span>
                             <span className="text-xs font-semibold text-slate-600 bg-slate-100 px-2 py-0.5 rounded">
                               {pain.affectedApps.length} {pain.affectedApps.length === 1 ? 'app' : 'apps'}
@@ -1217,7 +1217,7 @@ export function TopPains({
                             pain.severity === 'medium' ? 'text-orange-600' : 
                             'text-yellow-600'
                           }`} />
-                          <span className="text-sm text-slate-900 truncate flex-1">{pain.title}</span>
+                          <span className="text-sm text-slate-900 truncate flex-1">{markMock(pain.title)}</span>
                         </button>
                       );
                     })}
@@ -1278,7 +1278,7 @@ export function TopPains({
                             #{globalIndex + 1}
                           </span>
                         </div>
-                        <h3 className="font-semibold text-slate-900 flex-1">{pain.title}</h3>
+                        <h3 className="font-semibold text-slate-900 flex-1">{markMock(pain.title)}</h3>
                         <span className="px-3 py-1 rounded bg-slate-100 text-slate-900 font-semibold text-sm whitespace-nowrap self-start">
                           {pain.percentage}% of feedback
                         </span>
@@ -1740,7 +1740,7 @@ export function TopPains({
                 <div className="flex flex-wrap gap-2">
                   {selectedPainForDetail.affectedApps.map((app, index) => (
                     <div key={index} className="inline-flex items-center px-2.5 py-1.5 bg-slate-50 rounded border border-slate-200">
-                      <span className="text-slate-900 text-sm">{app}</span>
+                      <span className="text-slate-900 text-sm">{markMock(app)}</span>
                     </div>
                   ))}
                 </div>

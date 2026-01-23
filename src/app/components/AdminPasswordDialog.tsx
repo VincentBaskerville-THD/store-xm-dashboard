@@ -8,18 +8,17 @@ interface AdminPasswordDialogProps {
   open: boolean;
   onClose: () => void;
   onSuccess: () => void;
+  password: string;
 }
 
-const ADMIN_PASSWORD = 'happyness';
-
-export function AdminPasswordDialog({ open, onClose, onSuccess }: AdminPasswordDialogProps) {
+export function AdminPasswordDialog({ open, onClose, onSuccess, password: adminPassword }: AdminPasswordDialogProps) {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (password === ADMIN_PASSWORD) {
+    if (password === adminPassword) {
       setError('');
       setPassword('');
       onSuccess();

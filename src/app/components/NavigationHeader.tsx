@@ -1,7 +1,6 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { Button } from './ui/button';
 import { FileDown } from 'lucide-react';
-import { AdminPasswordDialog } from './AdminPasswordDialog';
 
 interface NavigationHeaderProps {
   currentView: 'home' | 'all-apps' | 'key-journeys' | 'top-pains' | 'other';
@@ -15,6 +14,7 @@ interface NavigationHeaderProps {
   subtitle?: string;
   lastUpdated?: string;
   showExportButton?: boolean;
+  showAdminButton?: boolean;
 }
 
 export function NavigationHeader({
@@ -29,6 +29,7 @@ export function NavigationHeader({
   subtitle,
   lastUpdated,
   showExportButton = true,
+  showAdminButton = true,
 }: NavigationHeaderProps) {
   const navItems = [
     { id: 'home', label: 'Home', onClick: onNavigateHome },
@@ -37,7 +38,7 @@ export function NavigationHeader({
     { id: 'top-pains', label: 'Top Pains', onClick: onNavigateTopPains },
   ];
 
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const isAdminButtonVisible = showAdminButton && (localStorage.getItem('adminShowButton') ?? 'true') !== 'false';
 
   return (
     <header className="border-b border-slate-200 bg-slate-900 text-white">
@@ -84,11 +85,11 @@ export function NavigationHeader({
                 Export PDF
               </Button>
             )}
-            {onNavigateAdmin && (
+            {onNavigateAdmin && isAdminButtonVisible && (
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => setIsDialogOpen(true)}
+                onClick={onNavigateAdmin}
                 className="bg-slate-800 border-slate-700 text-white hover:bg-slate-700 w-full sm:w-auto"
                 title="Admin Access"
               >
@@ -100,16 +101,6 @@ export function NavigationHeader({
         {lastUpdated && <p className="text-slate-400 mt-3 text-sm">Last updated: {lastUpdated}</p>}
       </div>
 
-      {onNavigateAdmin && (
-        <AdminPasswordDialog
-          open={isDialogOpen}
-          onClose={() => setIsDialogOpen(false)}
-          onSuccess={() => {
-            setIsDialogOpen(false);
-            onNavigateAdmin();
-          }}
-        />
-      )}
     </header>
   );
 }

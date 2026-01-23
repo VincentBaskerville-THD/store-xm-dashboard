@@ -6,7 +6,7 @@ import { Label } from './ui/label';
 import { Textarea } from './ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Plus, Edit2, Save, X, ChevronDown, ChevronUp, Trash2, GripVertical, ArrowRight, Eye, Clock, CheckCircle, XCircle } from 'lucide-react';
-import { mockApps, getScoreColor } from '../data/mockData';
+import { mockApps, getScoreColor, markMock } from '../data/mockData';
 import { AdminTabNav } from './AdminTabNav';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 
@@ -85,7 +85,7 @@ interface Journey {
 }
 
 // Mock data - in production this would come from your database
-const mockJourneys: Journey[] = [
+const rawMockJourneys: Journey[] = [
   {
     id: '1',
     name: 'Start Online Return In Store (SORIS)',
@@ -189,6 +189,18 @@ const mockJourneys: Journey[] = [
     collectionFrequency: 'weekly',
   },
 ];
+
+const mockJourneys: Journey[] = rawMockJourneys.map(journey => ({
+  ...journey,
+  name: markMock(journey.name),
+  description: journey.description ? markMock(journey.description) : journey.description,
+  steps: journey.steps.map(step => ({
+    ...step,
+    name: markMock(step.name),
+    appName: markMock(step.appName),
+    description: step.description ? markMock(step.description) : step.description,
+  })),
+}));
 
 export function ManageJourneys({
   onNavigateBack,

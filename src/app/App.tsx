@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { PortfolioOverview } from './components/PortfolioOverview';
 import { AppDetail } from './components/AppDetail';
 import { AppDetailEnhanced } from './components/AppDetailEnhanced';
@@ -14,6 +14,7 @@ import { ManageJourneys } from './components/ManageJourneys';
 import { ManageApps } from './components/ManageApps';
 import { ManageSettings } from './components/ManageSettings';
 import { ExportReport } from './components/ExportReport';
+import { AdminPasswordDialog } from './components/AdminPasswordDialog';
 import type { TimePeriodData } from './components/TimeSelector';
 
 export type ViewType =
@@ -71,6 +72,12 @@ function App() {
   const [currentView, setCurrentView] = useState<ViewType>('portfolio');
   const [selectedApp, setSelectedApp] = useState<string | null>(null);
   const [selectedJourney, setSelectedJourney] = useState<string | null>(null);
+  const [adminPassword, setAdminPassword] = useState(() => localStorage.getItem('adminPassword') ?? 'happyness');
+  const [adminAuthEnabled, setAdminAuthEnabled] = useState(() => (localStorage.getItem('adminAuthEnabled') ?? 'true') !== 'false');
+  const [adminShowButton, setAdminShowButton] = useState(() => (localStorage.getItem('adminShowButton') ?? 'true') !== 'false');
+  const [adminAuthenticated, setAdminAuthenticated] = useState(() => sessionStorage.getItem('adminAuthed') === 'true');
+  const [isAdminDialogOpen, setIsAdminDialogOpen] = useState(false);
+  const [pendingAdminRedirect, setPendingAdminRedirect] = useState(false);
   const [navigationHistory, setNavigationHistory] = useState<NavigationState[]>([
     { view: 'portfolio', selectedApp: null, selectedJourney: null }
   ]);
@@ -88,21 +95,34 @@ function App() {
     setNavigationHistory(prev => [...prev, newState]);
   };
 
+  const basePath = import.meta.env.BASE_URL ?? '/';
+  const adminPath = basePath.endsWith('/') ? `${basePath}admin` : `${basePath}/admin`;
+
+  const syncPath = (view: ViewType) => {
+    const targetPath = view.startsWith('admin') ? adminPath : basePath;
+    if (window.location.pathname !== targetPath) {
+      window.history.pushState({}, '', targetPath);
+    }
+  };
+
   const navigateToAppDetail = (appId: string) => {
     pushToHistory('app-detail-enhanced', appId, null);
     setSelectedApp(appId);
     setCurrentView('app-detail-enhanced');
+    syncPath('app-detail-enhanced');
   };
 
   const navigateToJourneyDetail = (journeyId: string) => {
     pushToHistory('journey-detail-enhanced', null, journeyId);
     setSelectedJourney(journeyId);
     setCurrentView('journey-detail-enhanced');
+    syncPath('journey-detail-enhanced');
   };
 
   const navigateToView = (view: ViewType) => {
     pushToHistory(view, null, null);
     setCurrentView(view);
+    syncPath(view);
   };
 
   const navigateToPortfolio = () => {
@@ -110,6 +130,7 @@ function App() {
     setCurrentView('portfolio');
     setSelectedApp(null);
     setSelectedJourney(null);
+    syncPath('portfolio');
   };
 
   const navigateToAllApps = () => {
@@ -117,6 +138,7 @@ function App() {
     setCurrentView('all-apps');
     setSelectedApp(null);
     setSelectedJourney(null);
+    syncPath('all-apps');
   };
 
   const navigateToAllJourneys = () => {
@@ -124,6 +146,7 @@ function App() {
     setCurrentView('all-journeys');
     setSelectedApp(null);
     setSelectedJourney(null);
+    syncPath('all-journeys');
   };
 
   const navigateToTopPains = () => {
@@ -131,6 +154,7 @@ function App() {
     setCurrentView('top-pains');
     setSelectedApp(null);
     setSelectedJourney(null);
+    syncPath('top-pains');
   };
 
   const navigateToAdminThemes = () => {
@@ -138,6 +162,7 @@ function App() {
     setCurrentView('admin-manage-themes');
     setSelectedApp(null);
     setSelectedJourney(null);
+    syncPath('admin-manage-themes');
   };
 
   const navigateToManageThemes = () => {
@@ -145,6 +170,7 @@ function App() {
     setCurrentView('admin-manage-themes');
     setSelectedApp(null);
     setSelectedJourney(null);
+    syncPath('admin-manage-themes');
   };
 
   const navigateToManageJourneys = () => {
@@ -152,6 +178,7 @@ function App() {
     setCurrentView('admin-manage-journeys');
     setSelectedApp(null);
     setSelectedJourney(null);
+    syncPath('admin-manage-journeys');
   };
 
   const navigateToManageApps = () => {
@@ -159,6 +186,7 @@ function App() {
     setCurrentView('admin-manage-apps');
     setSelectedApp(null);
     setSelectedJourney(null);
+    syncPath('admin-manage-apps');
   };
 
   const navigateToManageSettings = () => {
@@ -166,6 +194,7 @@ function App() {
     setCurrentView('admin-settings');
     setSelectedApp(null);
     setSelectedJourney(null);
+    syncPath('admin-settings');
   };
 
   const navigateToExport = () => {
@@ -173,7 +202,48 @@ function App() {
     setCurrentView('export-report');
     setSelectedApp(null);
     setSelectedJourney(null);
+    syncPath('export-report');
   };
+
+  const requestAdminAccess = () => {
+    if (!adminAuthEnabled || adminAuthenticated) {
+      navigateToAdminThemes();
+      return;
+    }
+    setPendingAdminRedirect(true);
+    setIsAdminDialogOpen(true);
+  };
+
+  useEffect(() => {
+    localStorage.setItem('adminPassword', adminPassword);
+  }, [adminPassword]);
+
+  useEffect(() => {
+    localStorage.setItem('adminAuthEnabled', String(adminAuthEnabled));
+  }, [adminAuthEnabled]);
+
+  useEffect(() => {
+    localStorage.setItem('adminShowButton', String(adminShowButton));
+  }, [adminShowButton]);
+
+  useEffect(() => {
+    if (adminAuthEnabled) return;
+    setIsAdminDialogOpen(false);
+  }, [adminAuthEnabled]);
+
+  useEffect(() => {
+    const handlePath = () => {
+      const path = window.location.pathname;
+      const normalizedAdminPath = adminPath.endsWith('/') ? adminPath.slice(0, -1) : adminPath;
+      if (path === adminPath || path === normalizedAdminPath) {
+        requestAdminAccess();
+      }
+    };
+
+    handlePath();
+    window.addEventListener('popstate', handlePath);
+    return () => window.removeEventListener('popstate', handlePath);
+  }, [adminAuthEnabled, adminAuthenticated, adminPath]);
   const handleAdminTabChange = (tab: 'manage-themes' | 'manage-journeys' | 'manage-apps' | 'settings') => {
     if (tab === 'manage-themes') {
       navigateToManageThemes();
@@ -220,6 +290,21 @@ function App() {
 
   return (
     <div className="min-h-screen bg-slate-50">
+      <AdminPasswordDialog
+        open={isAdminDialogOpen}
+        onClose={() => {
+          setIsAdminDialogOpen(false);
+          setPendingAdminRedirect(false);
+        }}
+        onSuccess={() => {
+          sessionStorage.setItem('adminAuthed', 'true');
+          setAdminAuthenticated(true);
+          setIsAdminDialogOpen(false);
+          setPendingAdminRedirect(false);
+          navigateToAdminThemes();
+        }}
+        password={adminPassword}
+      />
       {currentView === 'portfolio' && (
         <PortfolioOverview
           timePeriod={timePeriod}
@@ -227,7 +312,7 @@ function App() {
           onNavigateToApp={navigateToAppDetail}
           onNavigateToJourney={navigateToJourneyDetail}
           onNavigateToView={navigateToView}
-          onNavigateAdmin={navigateToAdminThemes}
+          onNavigateAdmin={requestAdminAccess}
           onNavigateExport={navigateToExport}
         />
       )}
@@ -249,7 +334,7 @@ function App() {
           onNavigateAllApps={navigateToAllApps}
           onNavigateKeyJourneys={navigateToAllJourneys}
           onNavigateTopPains={navigateToTopPains}
-          onNavigateAdmin={navigateToAdminThemes}
+          onNavigateAdmin={requestAdminAccess}
           onNavigateExport={navigateToExport}
         />
       )}
@@ -272,7 +357,7 @@ function App() {
           onNavigateAllApps={navigateToAllApps}
           onNavigateKeyJourneys={navigateToAllJourneys}
           onNavigateTopPains={navigateToTopPains}
-          onNavigateAdmin={navigateToAdminThemes}
+          onNavigateAdmin={requestAdminAccess}
           onNavigateExport={navigateToExport}
         />
       )}
@@ -284,7 +369,7 @@ function App() {
           onNavigateAllApps={navigateToAllApps}
           onNavigateKeyJourneys={navigateToAllJourneys}
           onNavigateTopPains={navigateToTopPains}
-          onNavigateAdmin={navigateToAdminThemes}
+          onNavigateAdmin={requestAdminAccess}
           onNavigateExport={navigateToExport}
         />
       )}
@@ -298,7 +383,7 @@ function App() {
           onNavigateAllApps={navigateToAllApps}
           onNavigateKeyJourneys={navigateToAllJourneys}
           onNavigateTopPains={navigateToTopPains}
-          onNavigateAdmin={navigateToAdminThemes}
+          onNavigateAdmin={requestAdminAccess}
           onNavigateExport={navigateToExport}
         />
       )}
@@ -378,6 +463,12 @@ function App() {
           onNavigateKeyJourneys={navigateToAllJourneys}
           onNavigateTopPains={navigateToTopPains}
           onTabChange={handleAdminTabChange}
+          adminAuthEnabled={adminAuthEnabled}
+          adminShowButton={adminShowButton}
+          adminPassword={adminPassword}
+          onAdminAuthEnabledChange={setAdminAuthEnabled}
+          onAdminShowButtonChange={setAdminShowButton}
+          onAdminPasswordChange={setAdminPassword}
         />
       )}
       {currentView === 'export-report' && (
@@ -387,7 +478,7 @@ function App() {
           onNavigateAllApps={navigateToAllApps}
           onNavigateKeyJourneys={navigateToAllJourneys}
           onNavigateTopPains={navigateToTopPains}
-          onNavigateAdmin={navigateToAdminThemes}
+          onNavigateAdmin={requestAdminAccess}
         />
       )}
     </div>

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Card } from './ui/card';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -6,10 +6,11 @@ import { Label } from './ui/label';
 import { Textarea } from './ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Search, Filter, Edit2, Save, X, AlertCircle, Plus, Lock, Unlock, Eye, ArrowDown, Clock, CheckCircle, XCircle, ChevronDown, ChevronUp, GitBranch } from 'lucide-react';
-import { mockApps, mockJourneys } from '../data/mockData';
+import { mockApps, mockJourneys, markMock } from '../data/mockData';
 import { AdminTabNav } from './AdminTabNav';
 import { AdminThemesPreview } from './AdminThemesPreview';
 import { Switch } from './ui/switch';
+import { supabase } from '../lib/supabaseClient';
 
 interface ManageThemesProps {
   onNavigateBack: () => void;
@@ -30,6 +31,9 @@ interface ThemeOccurrence {
   journeyId?: string;
   journeyName?: string;
   timePeriod: string;
+  periodSortOrder?: number;
+  periodCode?: string;
+  persistenceTag?: string;
   percentage: number;
   type: 'positive' | 'negative' | 'neutral';
   status?: 'unresolved' | 'improving' | 'stabilized' | 'resolved-monitoring';
@@ -75,11 +79,11 @@ interface ExistingTheme {
 
 // Mock existing themes for search
 const mockExistingThemes: ExistingTheme[] = [
-  { title: 'Navigation Confusion', appId: '3', appName: 'Order Up', percentage: 28, type: 'negative', monthsActive: 3, trendDirection: 'increasing', trendPercentage: 5, crossAppCount: 1, isNew: false },
-  { title: 'Navigation Confusion', appId: '14', appName: 'Sidekick', percentage: 35, type: 'negative', monthsActive: 6, trendDirection: 'stable', trendPercentage: 0, crossAppCount: 2, isNew: false },
-  { title: 'Slow Performance', appId: '3', appName: 'Order Up', percentage: 22, type: 'negative', monthsActive: 5, trendDirection: 'decreasing', trendPercentage: -3, crossAppCount: 4, isNew: false },
-  { title: 'Login Issues', appId: '14', appName: 'Sidekick', percentage: 18, type: 'negative', monthsActive: 2, trendDirection: 'increasing', trendPercentage: 8, crossAppCount: 1, isNew: true },
-  { title: 'Intuitive Design', appId: '2', appName: 'My View', percentage: 42, type: 'positive', monthsActive: 12, trendDirection: 'stable', trendPercentage: 1, crossAppCount: 1, isNew: false },
+  { title: markMock('Navigation Confusion'), appId: '3', appName: markMock('Order Up'), percentage: 28, type: 'negative', monthsActive: 3, trendDirection: 'increasing', trendPercentage: 5, crossAppCount: 1, isNew: false },
+  { title: markMock('Navigation Confusion'), appId: '14', appName: markMock('Sidekick'), percentage: 35, type: 'negative', monthsActive: 6, trendDirection: 'stable', trendPercentage: 0, crossAppCount: 2, isNew: false },
+  { title: markMock('Slow Performance'), appId: '3', appName: markMock('Order Up'), percentage: 22, type: 'negative', monthsActive: 5, trendDirection: 'decreasing', trendPercentage: -3, crossAppCount: 4, isNew: false },
+  { title: markMock('Login Issues'), appId: '14', appName: markMock('Sidekick'), percentage: 18, type: 'negative', monthsActive: 2, trendDirection: 'increasing', trendPercentage: 8, crossAppCount: 1, isNew: true },
+  { title: markMock('Intuitive Design'), appId: '2', appName: markMock('My View'), percentage: 42, type: 'positive', monthsActive: 12, trendDirection: 'stable', trendPercentage: 1, crossAppCount: 1, isNew: false },
 ];
 
 // Mock data - in production this would come from your database
@@ -669,12 +673,74 @@ const emptyOccurrence: Partial<ThemeOccurrence> = {
   status: 'unresolved',
   descriptionBullets: [''],
   exampleComments: [],
-  timePeriod: 'November 2025',
+  timePeriod: '',
+  periodCode: undefined,
   monthsActive: undefined,
   trendDirection: undefined,
   trendPercentage: undefined,
   isNew: false,
   manualOverrides: {},
+};
+
+const normalizeStatus = (value?: string): ThemeOccurrence['status'] => {
+  if (!value) return undefined;
+  if (value === 'resolved_monitoring') return 'resolved-monitoring';
+  if (value === 'resolved-monitoring') return 'resolved-monitoring';
+  if (value === 'unresolved' || value === 'improving' || value === 'stabilized') {
+    return value;
+  }
+  return undefined;
+};
+
+const normalizeStatusForDb = (status?: ThemeOccurrence['status']) => {
+  if (!status) return undefined;
+  if (status === 'resolved-monitoring') return 'resolved_monitoring';
+  return status;
+};
+
+const toThemeId = (title: string) =>
+  title
+    .trim()
+    .toLowerCase()
+    .replace(/[^\w]+/g, '_')
+    .replace(/^_+|_+$/g, '');
+
+const mapObservationRow = (row: any): ThemeOccurrence => {
+  const themeName = row.theme_title ?? row.theme_name ?? row.themes?.title ?? row.title ?? 'Untitled Theme';
+  const themeId = row.theme_id ?? row.themeId ?? row.themeid ?? themeName;
+  const periodLabel = row.period_label ?? row.periodLabel ?? row.fiscal_periods?.label ?? row.period ?? row.time_period ?? 'Unknown';
+  const bullets = Array.isArray(row.bullets) ? row.bullets : [];
+  const exampleComments = Array.isArray(row.example_comments)
+    ? row.example_comments
+    : Array.isArray(row.exampleComments)
+      ? row.exampleComments
+      : [];
+
+  return {
+    id: String(row.observation_id ?? row.id ?? row.observationId ?? `${themeId}-${row.app_id ?? row.appId ?? 'portfolio'}-${periodLabel}`),
+    themeId,
+    themeName,
+    appId: row.app_id ?? row.appId ?? 'portfolio',
+    appName: row.app_name ?? row.appName ?? row.apps?.name ?? 'Portfolio',
+    journeyId: row.journey_id ?? row.journeyId,
+    journeyName: row.journey_name ?? row.journeyName ?? row.journeys?.name,
+    timePeriod: periodLabel,
+    periodSortOrder: typeof row.sort_order === 'number' ? row.sort_order : row.fiscal_periods?.sort_order ?? row.period_sort_order,
+    periodCode: row.period ?? row.period_code ?? row.periodCode,
+    percentage: row.percent_of_feedback ?? row.percentage ?? 0,
+    type: row.theme_type ?? row.type ?? row.default_type ?? 'negative',
+    status: normalizeStatus(row.status),
+    descriptionBullets: bullets.length > 0 ? bullets : (row.narrative ? [row.narrative] : []),
+    exampleComments,
+    monthsActive: row.months_active ?? row.monthsActive,
+    persistenceTag: row.persistence_tag ?? row.persistenceTag,
+    trendDirection: row.trend_direction ?? row.trendDirection,
+    trendPercentage: row.trend_percentage ?? row.trendPercentage,
+    isNew: row.is_new ?? row.isNew,
+    createdAt: row.created_at ?? row.createdAt ?? '',
+    updatedAt: row.updated_at ?? row.updatedAt ?? row.created_at ?? row.createdAt ?? '',
+    manualOverrides: {},
+  };
 };
 
 // Helper function to group occurrences by theme
@@ -715,7 +781,19 @@ export function ManageThemes({
   onNavigateTopPains,
   onTabChange,
 }: ManageThemesProps) {
-  const [occurrences, setOccurrences] = useState<ThemeOccurrence[]>(mockThemeOccurrences);
+  const [occurrences, setOccurrences] = useState<ThemeOccurrence[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [fiscalPeriods, setFiscalPeriods] = useState<Array<{ period: string; label: string; sort_order: number }>>([]);
+  const [scorePeriods, setScorePeriods] = useState<Array<{ period: string; label: string; sort_order: number }>>([]);
+  const [appScorePeriodsByApp, setAppScorePeriodsByApp] = useState<Record<string, Array<{ period: string; label: string; sort_order: number }>>>({});
+  const [appPeriodsLoading, setAppPeriodsLoading] = useState<Record<string, boolean>>({});
+  const [appPeriodsError, setAppPeriodsError] = useState<Record<string, string>>({});
+  const [appCatalog, setAppCatalog] = useState<Array<{ id: string; name: string }>>([]);
+  const [journeyCatalog, setJourneyCatalog] = useState<Array<{ id: string; name: string }>>([]);
+  const [themeCatalog, setThemeCatalog] = useState<Array<{ id: string; title: string; default_type: string }>>([]);
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [expandedThemes, setExpandedThemes] = useState<Set<string>>(new Set());
   const [expandedStacks, setExpandedStacks] = useState<Set<string>>(new Set());
   const [searchQuery, setSearchQuery] = useState('');
@@ -766,6 +844,173 @@ export function ManageThemes({
   const [showRelatedOccurrences, setShowRelatedOccurrences] = useState(false);
   const [relatedOccurrencesFilterApp, setRelatedOccurrencesFilterApp] = useState<string>('all');
   const [relatedOccurrencesFilterMonth, setRelatedOccurrencesFilterMonth] = useState<string>('all');
+
+  const fetchThemes = async (referenceData: {
+    periods: Array<{ period: string; label: string; sort_order: number }>;
+    apps: Array<{ id: string; name: string }>;
+    journeys: Array<{ id: string; name: string }>;
+    themes: Array<{ id: string; title: string; default_type: string }>;
+  }) => {
+    const { data: latestRow, error: latestError } = await supabase
+      .from('pain_observations')
+      .select('period,created_at')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (latestError) {
+      throw latestError;
+    }
+
+    const latestPeriod = latestRow?.period;
+    if (!latestPeriod) return [];
+
+    const { data, error } = await supabase
+      .from('pain_observations')
+      .select(
+        [
+          'id',
+          'period',
+          'theme_id',
+          'theme_type',
+          'status',
+          'months_active',
+          'percent_of_feedback',
+          'narrative',
+          'bullets',
+          'app_id',
+          'journey_id',
+          'created_at'
+        ].join(',')
+      )
+      .eq('period', latestPeriod)
+      .order('created_at', { ascending: false })
+      .limit(500);
+
+    if (error) {
+      throw error;
+    }
+
+    const periodMap = new Map(referenceData.periods.map(period => [period.period, period]));
+    const appMap = new Map(referenceData.apps.map(app => [app.id, app.name]));
+    const journeyMap = new Map(referenceData.journeys.map(journey => [journey.id, journey.name]));
+    const themeMap = new Map(referenceData.themes.map(theme => [theme.id, theme]));
+
+    const rows = (data ?? []) as Array<any>;
+    const enrichedRows = rows.map(row => {
+      const period = periodMap.get(row.period);
+      const theme = themeMap.get(row.theme_id);
+      return {
+        ...row,
+        period_label: period?.label,
+        sort_order: period?.sort_order,
+        theme_title: theme?.title,
+        app_name: row.app_id ? appMap.get(row.app_id) : null,
+        journey_name: row.journey_id ? journeyMap.get(row.journey_id) : null,
+        default_type: theme?.default_type,
+      };
+    });
+
+    return enrichedRows.map(mapObservationRow);
+  };
+
+  const fetchReferenceData = async () => {
+    const [
+      { data: periods, error: periodsError },
+      { data: apps, error: appsError },
+      { data: journeys, error: journeysError },
+      { data: appPeriodRows, error: appPeriodError },
+      { data: themes, error: themesError },
+    ] =
+      await Promise.all([
+        supabase.from('fiscal_periods').select('period,label,sort_order').order('sort_order', { ascending: false }),
+        supabase.from('apps').select('id,name').order('name', { ascending: true }),
+        supabase.from('journeys').select('id,name').order('name', { ascending: true }),
+        supabase
+          .from('v_app_period_metrics_unified')
+          .select('period,period_label,sort_order,overall_score,response_count')
+          .or('overall_score.not.is.null,response_count.gt.0')
+          .order('sort_order', { ascending: false })
+          .limit(2000),
+        supabase.from('themes').select('id,title,default_type').order('title', { ascending: true }),
+      ]);
+
+    if (periodsError) throw periodsError;
+    if (appsError) throw appsError;
+    if (journeysError) throw journeysError;
+    if (themesError) throw themesError;
+
+    setFiscalPeriods(periods ?? []);
+    setAppCatalog(apps ?? []);
+    setJourneyCatalog(journeys ?? []);
+    setThemeCatalog(themes ?? []);
+    if (!appPeriodError) {
+      const periodMap = new Map<string, { period: string; label: string; sort_order: number }>();
+      (appPeriodRows ?? []).forEach(row => {
+        if (!periodMap.has(row.period)) {
+          periodMap.set(row.period, {
+            period: row.period,
+            label: row.period_label ?? row.period,
+            sort_order: row.sort_order ?? 0,
+          });
+        }
+      });
+      const scorePeriodList = Array.from(periodMap.values()).sort((a, b) => b.sort_order - a.sort_order);
+      setScorePeriods(scorePeriodList);
+      return {
+        periods: periods ?? [],
+        apps: apps ?? [],
+        journeys: journeys ?? [],
+        themes: themes ?? [],
+        scorePeriods: scorePeriodList,
+      };
+    }
+
+    setScorePeriods([]);
+    return {
+      periods: periods ?? [],
+      apps: apps ?? [],
+      journeys: journeys ?? [],
+      themes: themes ?? [],
+      scorePeriods: [],
+    };
+  };
+
+  useEffect(() => {
+    let isActive = true;
+
+    const load = async () => {
+      setIsLoading(true);
+      setLoadError(null);
+
+      try {
+        const reference = await fetchReferenceData();
+        const themeRows = await fetchThemes(reference);
+        if (!isActive) return;
+        setOccurrences(themeRows);
+      } catch (error: any) {
+        if (!isActive) return;
+        setLoadError(error?.message ?? 'Failed to load themes');
+        setOccurrences([]);
+      } finally {
+        if (isActive) {
+          setIsLoading(false);
+        }
+      }
+    };
+
+    load();
+
+    return () => {
+      isActive = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (isAddingNew && newOccurrence.appId) {
+      void loadAppPeriods(newOccurrence.appId, true);
+    }
+  }, [isAddingNew, newOccurrence.appId]);
 
   // Close search dropdown when clicking outside
   useEffect(() => {
@@ -844,6 +1089,92 @@ export function ManageThemes({
 
     return matchesSearch && matchesType;
   });
+
+  const appOptions = (appCatalog.length
+    ? appCatalog
+    : mockApps.map(app => ({ id: app.id, name: app.name }))
+  ).sort((a, b) => a.name.localeCompare(b.name));
+
+  const journeyOptions = (journeyCatalog.length
+    ? journeyCatalog
+    : mockJourneys.map(journey => ({ id: journey.id, name: journey.name }))
+  ).sort((a, b) => a.name.localeCompare(b.name));
+
+  const periodOptions = scorePeriods.length
+    ? scorePeriods.map(period => ({ period: period.period, label: period.label, sort_order: period.sort_order }))
+    : fiscalPeriods.length
+      ? fiscalPeriods.map(period => ({ period: period.period, label: period.label, sort_order: period.sort_order }))
+    : [
+        { period: 'FY26-10', label: 'Nov 2025', sort_order: 202610 },
+        { period: 'FY26-09', label: 'Oct 2025', sort_order: 202609 },
+        { period: 'FY26-08', label: 'Sep 2025', sort_order: 202608 },
+        { period: 'FY26-07', label: 'Aug 2025', sort_order: 202607 },
+        { period: 'FY26-06', label: 'Jul 2025', sort_order: 202606 },
+        { period: 'FY26-05', label: 'Jun 2025', sort_order: 202605 },
+      ];
+
+  const getPeriodOptionsForApp = (appId?: string) => {
+    if (!appId) return [];
+    return appScorePeriodsByApp[appId] ?? [];
+  };
+
+  const loadAppPeriods = async (appId: string, setDefaultForNew = false) => {
+    if (!appId || appPeriodsLoading[appId]) return;
+    if (appScorePeriodsByApp[appId]?.length) {
+      if (setDefaultForNew && newOccurrence.appId === appId && !newOccurrence.periodCode) {
+        const first = appScorePeriodsByApp[appId][0];
+        if (first) {
+          setNewOccurrence({
+            ...newOccurrence,
+            periodCode: first.period,
+            timePeriod: first.label,
+            periodSortOrder: first.sort_order,
+          });
+        }
+      }
+      return;
+    }
+
+    setAppPeriodsLoading(prev => ({ ...prev, [appId]: true }));
+    setAppPeriodsError(prev => ({ ...prev, [appId]: '' }));
+
+    const { data, error } = await supabase
+      .from('app_period_metrics')
+      .select('period,overall_score,response_count')
+      .eq('app_id', appId)
+      .or('overall_score.not.is.null,response_count.gt.0');
+
+    if (error) {
+      setAppPeriodsError(prev => ({ ...prev, [appId]: error.message }));
+      setAppPeriodsLoading(prev => ({ ...prev, [appId]: false }));
+      return;
+    }
+
+    const periodLookup = new Map(fiscalPeriods.map(period => [period.period, period]));
+    const periods = (data ?? []).map((row: any) => {
+      const periodInfo = periodLookup.get(row.period);
+      return {
+        period: row.period,
+        label: periodInfo?.label ?? row.period,
+        sort_order: periodInfo?.sort_order ?? 0,
+      };
+    });
+    periods.sort((a, b) => b.sort_order - a.sort_order);
+    setAppScorePeriodsByApp(prev => ({ ...prev, [appId]: periods }));
+    setAppPeriodsLoading(prev => ({ ...prev, [appId]: false }));
+
+    if (setDefaultForNew && newOccurrence.appId === appId && !newOccurrence.periodCode) {
+      const first = periods[0];
+      if (first) {
+        setNewOccurrence({
+          ...newOccurrence,
+          periodCode: first.period,
+          timePeriod: first.label,
+          periodSortOrder: first.sort_order,
+        });
+      }
+    }
+  };
 
   // Get related occurrences for the currently editing theme
   const getRelatedOccurrences = () => {
@@ -998,7 +1329,9 @@ export function ManageThemes({
 
   const startAddingNew = () => {
     setIsAddingNew(true);
-    setNewTheme({ ...emptyTheme });
+    setNewOccurrence({
+      ...emptyOccurrence,
+    });
     setThemeSearchQuery('');
     setManualMetadataMode(false);
     setShowExampleComments(false);
@@ -1006,7 +1339,7 @@ export function ManageThemes({
 
   const cancelAddingNew = () => {
     setIsAddingNew(false);
-    setNewTheme({ ...emptyTheme });
+    setNewOccurrence({ ...emptyOccurrence });
     setThemeSearchQuery('');
     setManualMetadataMode(false);
     setShowExampleComments(false);
@@ -1020,31 +1353,106 @@ export function ManageThemes({
     setShowPreview(true);
   };
 
-  const saveNewOccurrence = () => {
-    if (newOccurrence.themeName && newOccurrence.percentage && newOccurrence.descriptionBullets && newOccurrence.descriptionBullets.filter(b => b.trim()).length > 0) {
-      const occurrence: ThemeOccurrence = {
-        id: `occ-${Date.now()}`,
-        themeId: newOccurrence.themeName?.toLowerCase().replace(/\s+/g, '-') ?? '',
-        themeName: newOccurrence.themeName,
-        appId: newOccurrence.appId ?? '',
-        appName: newOccurrence.appName ?? '',
-        journeyId: newOccurrence.journeyId,
-        journeyName: newOccurrence.journeyName,
-        timePeriod: newOccurrence.timePeriod ?? 'November 2025',
-        percentage: newOccurrence.percentage,
-        type: newOccurrence.type ?? 'negative',
-        status: newOccurrence.status,
-        descriptionBullets: newOccurrence.descriptionBullets.filter(b => b.trim()),
-        exampleComments: newOccurrence.exampleComments?.filter(c => c.trim()) ?? [],
-        monthsActive: newOccurrence.monthsActive,
-        trendDirection: newOccurrence.trendDirection,
-        trendPercentage: newOccurrence.trendPercentage,
-        isNew: newOccurrence.isNew,
-        createdAt: new Date().toISOString().split('T')[0],
-        updatedAt: new Date().toISOString().split('T')[0],
-        manualOverrides: newOccurrence.manualOverrides ?? {},
-      };
-      setOccurrences([...occurrences, occurrence]);
+  const saveNewOccurrence = async () => {
+    if (!newOccurrence.themeName || !newOccurrence.percentage || !newOccurrence.descriptionBullets || newOccurrence.descriptionBullets.filter(b => b.trim()).length === 0) {
+      return;
+    }
+
+    setIsSaving(true);
+    setSaveError(null);
+
+    try {
+      const themeTitle = newOccurrence.themeName.trim();
+      const themeId = newOccurrence.themeId ?? toThemeId(themeTitle);
+      const periodCode = newOccurrence.periodCode
+        ?? periodOptions.find(period => period.label === newOccurrence.timePeriod)?.period
+        ?? newOccurrence.timePeriod;
+
+      if (!periodCode) {
+        setSaveError('Please select a valid period.');
+        return;
+      }
+
+      const scopeType = newOccurrence.journeyId
+        ? 'journey'
+        : newOccurrence.appId
+          ? 'app'
+          : 'portfolio';
+
+      const { data: existingTheme, error: themeLookupError } = await supabase
+        .from('themes')
+        .select('id,title')
+        .eq('title', themeTitle)
+        .maybeSingle();
+
+      if (themeLookupError) {
+        throw themeLookupError;
+      }
+
+      let resolvedThemeId = existingTheme?.id ?? themeId;
+
+      if (!existingTheme) {
+        const { error: themeInsertError } = await supabase
+          .from('themes')
+          .insert({
+            id: resolvedThemeId,
+            title: themeTitle,
+            description: newOccurrence.descriptionBullets?.filter(b => b.trim()).join(' ') || null,
+            default_type: newOccurrence.type ?? 'negative',
+            tags: [],
+          });
+
+        if (themeInsertError) {
+          throw themeInsertError;
+        }
+      }
+
+      const bullets = newOccurrence.descriptionBullets?.filter(b => b.trim()) ?? [];
+      const { data: observation, error: observationError } = await supabase
+        .from('pain_observations')
+        .insert({
+          period: periodCode,
+          theme_id: resolvedThemeId,
+          scope_type: scopeType,
+          app_id: scopeType === 'app' ? newOccurrence.appId : null,
+          journey_id: scopeType === 'journey' ? newOccurrence.journeyId : null,
+          theme_type: newOccurrence.type ?? 'negative',
+          severity: 'medium',
+          status: normalizeStatusForDb(newOccurrence.status) ?? 'unresolved',
+          months_active: newOccurrence.monthsActive ?? null,
+          mentions_count: null,
+          percent_of_feedback: newOccurrence.percentage ?? null,
+          narrative: bullets[0] ?? null,
+          bullets: bullets.length ? bullets : null,
+        })
+        .select('id')
+        .single();
+
+      if (observationError) {
+        throw observationError;
+      }
+
+      if (newOccurrence.appId) {
+        const { error: linkError } = await supabase
+          .from('pain_observation_apps')
+          .insert({
+            observation_id: observation?.id,
+            app_id: newOccurrence.appId,
+          });
+
+        if (linkError) {
+          throw linkError;
+        }
+      }
+
+      const refreshed = await fetchThemes({
+        periods: fiscalPeriods,
+        apps: appCatalog,
+        journeys: journeyCatalog,
+        themes: themeCatalog,
+      });
+      setOccurrences(refreshed);
+
       setIsAddingNew(false);
       setNewOccurrence({ ...emptyOccurrence });
       setThemeSearchQuery('');
@@ -1052,6 +1460,10 @@ export function ManageThemes({
       setShowPreview(false);
       setSuccessMessage('Theme occurrence created successfully!');
       setTimeout(() => setSuccessMessage(''), 3000);
+    } catch (error: any) {
+      setSaveError(error?.message ?? 'Failed to create theme.');
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -1218,6 +1630,11 @@ export function ManageThemes({
     return `Chronic issue (${monthsActive}+ months)`;
   };
 
+  const getDisplayPersistenceLabel = (occurrence?: { persistenceTag?: string; monthsActive?: number }) => {
+    if (occurrence?.persistenceTag) return occurrence.persistenceTag;
+    return getPersistenceLabel(occurrence?.monthsActive);
+  };
+
   const renderThemeForm = (occurrence: Partial<ThemeOccurrence>, isNew: boolean) => {
     const currentOccurrence = isNew ? newOccurrence : editingOccurrence;
     if (!currentOccurrence) return null;
@@ -1231,14 +1648,35 @@ export function ManageThemes({
             <div className="space-y-2">
               <Label>Target App</Label>
               <Select 
-                value={currentOccurrence.appId || ''} 
+                value={currentOccurrence.appId ?? 'none'} 
                 onValueChange={(value) => {
-                  const app = mockApps.find(a => a.id === value);
+                  if (value === 'none') {
+                    if (isNew) {
+                      setNewOccurrence(prev => ({
+                        ...prev,
+                        appId: undefined,
+                        appName: undefined,
+                        periodCode: undefined,
+                        timePeriod: '',
+                        periodSortOrder: undefined,
+                      }));
+                    } else {
+                      updateEditingOccurrence('appId', undefined);
+                      updateEditingOccurrence('appName', undefined);
+                      updateEditingOccurrence('periodCode', undefined);
+                      updateEditingOccurrence('timePeriod', '');
+                      updateEditingOccurrence('periodSortOrder', undefined);
+                    }
+                    return;
+                  }
+                  const app = appOptions.find(a => a.id === value);
                   if (isNew) {
                     setNewOccurrence({ ...newOccurrence, appId: value, appName: app?.name });
+                    void loadAppPeriods(value, true);
                   } else {
                     updateEditingOccurrence('appId', value);
                     updateEditingOccurrence('appName', app?.name);
+                    void loadAppPeriods(value);
                   }
                 }}
               >
@@ -1247,7 +1685,7 @@ export function ManageThemes({
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="none">None</SelectItem>
-                  {mockApps.map(app => (
+                  {appOptions.map(app => (
                     <SelectItem key={app.id} value={app.id}>{app.name}</SelectItem>
                   ))}
                 </SelectContent>
@@ -1255,23 +1693,45 @@ export function ManageThemes({
             </div>
 
             <div className="space-y-2">
-              <Label>Time Period</Label>
+              <Label>Target Month</Label>
               <Select 
-                value={currentOccurrence.timePeriod || 'November 2025'} 
-                onValueChange={(value) => isNew ? updateNewOccurrence('timePeriod', value) : updateEditingOccurrence('timePeriod', value)}
+                value={currentOccurrence.periodCode || ''} 
+                onValueChange={(value) => {
+                  const selected = getPeriodOptionsForApp(currentOccurrence.appId).find(period => period.period === value);
+                  if (isNew) {
+                    setNewOccurrence({
+                      ...newOccurrence,
+                      periodCode: value,
+                      timePeriod: selected?.label ?? value,
+                      periodSortOrder: selected?.sort_order,
+                    });
+                  } else {
+                    updateEditingOccurrence('periodCode', value);
+                    updateEditingOccurrence('timePeriod', selected?.label ?? value);
+                    updateEditingOccurrence('periodSortOrder', selected?.sort_order);
+                  }
+                }}
+                disabled={!currentOccurrence.appId || appPeriodsLoading[currentOccurrence.appId]}
               >
                 <SelectTrigger>
-                  <SelectValue />
+                  <SelectValue placeholder={currentOccurrence.appId ? 'Select month' : 'Select app first'} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="November 2025">November 2025</SelectItem>
-                  <SelectItem value="October 2025">October 2025</SelectItem>
-                  <SelectItem value="Q4 2025">Q4 2025</SelectItem>
-                  <SelectItem value="Q3 2025">Q3 2025</SelectItem>
-                  <SelectItem value="2025">2025</SelectItem>
-                  <SelectItem value="2024">2024</SelectItem>
+                  {getPeriodOptionsForApp(currentOccurrence.appId).length === 0 && (
+                    <SelectItem value="no-data" disabled>
+                      {appPeriodsLoading[currentOccurrence.appId ?? '']
+                        ? 'Loading months...'
+                        : 'No scored months found'}
+                    </SelectItem>
+                  )}
+                  {getPeriodOptionsForApp(currentOccurrence.appId).map(period => (
+                    <SelectItem key={period.period} value={period.period}>{period.label}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
+              {currentOccurrence.appId && appPeriodsError[currentOccurrence.appId] && (
+                <p className="text-xs text-red-600">{appPeriodsError[currentOccurrence.appId]}</p>
+              )}
             </div>
 
             <div className="space-y-2">
@@ -1289,7 +1749,7 @@ export function ManageThemes({
                       updateEditingOccurrence('journeyName', undefined);
                     }
                   } else {
-                    const journey = mockJourneys.find(j => j.id === value);
+                    const journey = journeyOptions.find(j => j.id === value);
                     if (isNew) {
                       setNewOccurrence({ ...newOccurrence, journeyId: value, journeyName: journey?.name });
                     } else {
@@ -1304,7 +1764,7 @@ export function ManageThemes({
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="none">None</SelectItem>
-                  {mockJourneys.map(journey => (
+                  {journeyOptions.map(journey => (
                     <SelectItem key={journey.id} value={journey.id}>{journey.name}</SelectItem>
                   ))}
                   <SelectItem value="create-new">
@@ -1592,7 +2052,7 @@ export function ManageThemes({
                     />
                   ) : (
                     <div className="p-2 bg-white border border-slate-300 rounded text-sm text-slate-400">
-                      {getPersistenceLabel(currentOccurrence.monthsActive)}
+                      {getDisplayPersistenceLabel(currentOccurrence)}
                     </div>
                   )}
                 </div>
@@ -1704,7 +2164,7 @@ export function ManageThemes({
             percentage: newOccurrence.percentage ?? 0,
             type: newOccurrence.type ?? 'negative',
             descriptionBullets: newOccurrence.descriptionBullets ?? [],
-            exampleComments: newOccurrence.exampleComments,
+            exampleComments: newOccurrence.exampleComments ?? [],
             monthsActive: newOccurrence.monthsActive,
             trendDirection: newOccurrence.trendDirection,
             trendPercentage: newOccurrence.trendPercentage,
@@ -2103,6 +2563,19 @@ export function ManageThemes({
             {successMessage}
           </div>
         )}
+        {saveError && (
+          <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded text-red-800">
+            {saveError}
+          </div>
+        )}
+        {loadError && (
+          <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded text-red-800">
+            Failed to load themes from Supabase: {loadError}
+          </div>
+        )}
+        {isLoading && (
+          <div className="mb-6 text-sm text-slate-600">Loading themes...</div>
+        )}
 
         {/* Add New Theme Button */}
         <div className="mb-6 flex justify-between items-center">
@@ -2168,7 +2641,7 @@ export function ManageThemes({
                           )}
                           {newOccurrence.monthsActive !== undefined && newOccurrence.monthsActive > 0 && (
                             <span className="text-xs px-2 py-1 rounded bg-slate-100 text-slate-700 font-medium">
-                              {getPersistenceLabel(newOccurrence.monthsActive)}
+                              {getDisplayPersistenceLabel(newOccurrence)}
                             </span>
                           )}
                           {newOccurrence.trendDirection && newOccurrence.trendDirection !== 'stable' && (
@@ -2245,11 +2718,12 @@ export function ManageThemes({
               </Button>
               <Button 
                 onClick={saveNewOccurrence}
+                disabled={isSaving}
                 style={{ backgroundColor: '#ff6900', color: 'white' }}
                 className="hover:bg-orange-600"
               >
                 <Save className="size-4 mr-2" />
-                Save Theme
+                {isSaving ? 'Saving...' : 'Save Theme'}
               </Button>
             </div>
           </Card>
@@ -2276,7 +2750,7 @@ export function ManageThemes({
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">All Apps</SelectItem>
-                    {mockApps.map(app => (
+                    {appOptions.map(app => (
                       <SelectItem key={app.id} value={app.id}>{app.name}</SelectItem>
                     ))}
                   </SelectContent>
@@ -2328,12 +2802,16 @@ export function ManageThemes({
               });
               
               // Sort each stack by time period (most recent first)
+              const getSortValue = (occurrence: ThemeOccurrence) => {
+                if (typeof occurrence.periodSortOrder === 'number') {
+                  return occurrence.periodSortOrder;
+                }
+                const parsed = new Date(occurrence.timePeriod).getTime();
+                return Number.isNaN(parsed) ? 0 : parsed;
+              };
+
               stackMap.forEach(stack => {
-                stack.sort((a, b) => {
-                  const dateA = new Date(a.timePeriod);
-                  const dateB = new Date(b.timePeriod);
-                  return dateB.getTime() - dateA.getTime();
-                });
+                stack.sort((a, b) => getSortValue(b) - getSortValue(a));
               });
               
               const stacks = Array.from(stackMap.entries());
@@ -2385,7 +2863,7 @@ export function ManageThemes({
                               )}
                               {topOccurrence.monthsActive !== undefined && topOccurrence.monthsActive > 0 && (
                                 <span className="text-xs px-2 py-1 rounded bg-slate-100 text-slate-700 font-medium">
-                                  {getPersistenceLabel(topOccurrence.monthsActive)}
+                                  {getDisplayPersistenceLabel(topOccurrence)}
                                 </span>
                               )}
                               {topOccurrence.trendDirection && topOccurrence.trendDirection !== 'stable' && (
@@ -2506,7 +2984,7 @@ export function ManageThemes({
                                   )}
                                   {occurrence.monthsActive !== undefined && occurrence.monthsActive > 0 && (
                                     <span className="text-xs px-2 py-1 rounded bg-slate-100 text-slate-700 font-medium">
-                                      {getPersistenceLabel(occurrence.monthsActive)}
+                                      {getDisplayPersistenceLabel(occurrence)}
                                     </span>
                                   )}
                                   {occurrence.trendDirection && occurrence.trendDirection !== 'stable' && (
@@ -2604,7 +3082,7 @@ export function ManageThemes({
                       )}
                       {occurrence.monthsActive !== undefined && occurrence.monthsActive > 0 && (
                         <span className="text-xs px-2 py-1 rounded bg-slate-100 text-slate-700 font-medium">
-                          {getPersistenceLabel(occurrence.monthsActive)}
+                          {getDisplayPersistenceLabel(occurrence)}
                         </span>
                       )}
                       {occurrence.trendDirection && occurrence.trendDirection !== 'stable' && (
@@ -2862,7 +3340,7 @@ export function ManageThemes({
                           )}
                           {editingOccurrence?.monthsActive !== undefined && editingOccurrence.monthsActive > 0 && (
                             <span className="text-xs px-2 py-1 rounded bg-slate-100 text-slate-700 font-medium">
-                              {getPersistenceLabel(editingOccurrence.monthsActive)}
+                              {getDisplayPersistenceLabel(editingOccurrence)}
                             </span>
                           )}
                           {editingOccurrence?.trendDirection && editingOccurrence.trendDirection !== 'stable' && (
