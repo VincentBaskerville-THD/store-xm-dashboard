@@ -1,11 +1,11 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Card } from './ui/card';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Textarea } from './ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
-import { Search, Filter, Edit2, Save, X, AlertCircle, Plus, Lock, Unlock, Eye, ArrowDown, Clock, CheckCircle, XCircle, ChevronDown, ChevronUp, GitBranch } from 'lucide-react';
+import { Search, Filter, Edit2, Save, X, AlertCircle, Plus, Lock, Unlock, Eye, ArrowDown, Clock, CheckCircle, XCircle, ChevronDown, ChevronUp, GitBranch, Trash2 } from 'lucide-react';
 import { mockApps, mockJourneys, markMock } from '../data/mockData';
 import { AdminTabNav } from './AdminTabNav';
 import { AdminThemesPreview } from './AdminThemesPreview';
@@ -65,6 +65,7 @@ interface GroupedTheme {
 }
 
 interface ExistingTheme {
+  id?: string;
   title: string;
   appId: string;
   appName: string;
@@ -797,6 +798,8 @@ export function ManageThemes({
   const [expandedThemes, setExpandedThemes] = useState<Set<string>>(new Set());
   const [expandedStacks, setExpandedStacks] = useState<Set<string>>(new Set());
   const [searchQuery, setSearchQuery] = useState('');
+  const [groupBy, setGroupBy] = useState<'theme+app' | 'theme' | 'app'>('theme+app');
+  const [sortBy, setSortBy] = useState<'theme' | 'group-count' | 'app'>('theme');
   const [filterApp, setFilterApp] = useState<string>('all');
   const [filterJourney, setFilterJourney] = useState<string>('all');
   const [filterType, setFilterType] = useState<string>('all');
@@ -810,6 +813,8 @@ export function ManageThemes({
   const [manualMetadataMode, setManualMetadataMode] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
   const [showExampleComments, setShowExampleComments] = useState(false);
+  const [pageSize, setPageSize] = useState(50);
+  const [currentPage, setCurrentPage] = useState(1);
   
   // Journey creation modal states
   const [showJourneyModal, setShowJourneyModal] = useState(false);
@@ -851,20 +856,6 @@ export function ManageThemes({
     journeys: Array<{ id: string; name: string }>;
     themes: Array<{ id: string; title: string; default_type: string }>;
   }) => {
-    const { data: latestRow, error: latestError } = await supabase
-      .from('pain_observations')
-      .select('period,created_at')
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle();
-
-    if (latestError) {
-      throw latestError;
-    }
-
-    const latestPeriod = latestRow?.period;
-    if (!latestPeriod) return [];
-
     const { data, error } = await supabase
       .from('pain_observations')
       .select(
@@ -883,9 +874,8 @@ export function ManageThemes({
           'created_at'
         ].join(',')
       )
-      .eq('period', latestPeriod)
       .order('created_at', { ascending: false })
-      .limit(500);
+      .limit(2000);
 
     if (error) {
       throw error;
@@ -1026,6 +1016,63 @@ export function ManageThemes({
     };
   }, []);
 
+  const existingThemesForSearch = useMemo<ExistingTheme[]>(() => {
+    if (themeCatalog.length === 0 && occurrences.length === 0) {
+      return mockExistingThemes;
+    }
+
+    const themesById = new Map(themeCatalog.map(theme => [theme.id, theme]));
+    const grouped = groupOccurrencesByTheme(occurrences);
+
+    const fromOccurrences = grouped.map(group => {
+      const sorted = [...group.occurrences].sort((a, b) => {
+        const aValue = typeof a.periodSortOrder === 'number'
+          ? a.periodSortOrder
+          : new Date(a.timePeriod).getTime();
+        const bValue = typeof b.periodSortOrder === 'number'
+          ? b.periodSortOrder
+          : new Date(b.timePeriod).getTime();
+        return bValue - aValue;
+      });
+      const latest = sorted[0];
+      const catalogTheme = themesById.get(group.themeId);
+      const appCount = new Set(group.occurrences.map(occ => occ.appId)).size;
+
+      return {
+        id: group.themeId,
+        title: catalogTheme?.title ?? group.themeName,
+        appId: latest?.appId ?? 'portfolio',
+        appName: latest?.appName ?? 'Portfolio',
+        percentage: latest?.percentage ?? 0,
+        type: (latest?.type ?? catalogTheme?.default_type ?? 'negative') as ExistingTheme['type'],
+        monthsActive: latest?.monthsActive ?? 0,
+        trendDirection: latest?.trendDirection ?? 'stable',
+        trendPercentage: latest?.trendPercentage ?? 0,
+        crossAppCount: appCount,
+        isNew: Boolean(latest?.isNew),
+      };
+    });
+
+    const existingIds = new Set(fromOccurrences.map(theme => theme.id));
+    const fromCatalog = themeCatalog
+      .filter(theme => !existingIds.has(theme.id))
+      .map(theme => ({
+        id: theme.id,
+        title: theme.title,
+        appId: 'portfolio',
+        appName: 'All apps',
+        percentage: 0,
+        type: (theme.default_type ?? 'negative') as ExistingTheme['type'],
+        monthsActive: 0,
+        trendDirection: 'stable' as ExistingTheme['trendDirection'],
+        trendPercentage: 0,
+        crossAppCount: 0,
+        isNew: false,
+      }));
+
+    return [...fromOccurrences, ...fromCatalog];
+  }, [occurrences, themeCatalog]);
+
   // Search existing themes
   const searchThemes = (query: string) => {
     if (query.trim() === '') {
@@ -1033,9 +1080,9 @@ export function ManageThemes({
       return;
     }
 
-    const matches = mockExistingThemes.filter(theme =>
-      theme.title.toLowerCase().includes(query.toLowerCase())
-    );
+    const matches = existingThemesForSearch
+      .filter(theme => theme.title.toLowerCase().includes(query.toLowerCase()))
+      .slice(0, 20);
 
     setThemeSearchResults(matches);
   };
@@ -1045,7 +1092,7 @@ export function ManageThemes({
       setNewOccurrence({
         ...newOccurrence,
         themeName: existingTheme.title,
-        themeId: existingTheme.title.toLowerCase().replace(/\s+/g, '-'),
+        themeId: existingTheme.id ?? toThemeId(existingTheme.title),
         type: existingTheme.type,
         monthsActive: existingTheme.monthsActive,
         trendDirection: existingTheme.trendDirection,
@@ -1056,7 +1103,7 @@ export function ManageThemes({
       setEditingOccurrence({
         ...editingOccurrence,
         themeName: existingTheme.title,
-        themeId: existingTheme.title.toLowerCase().replace(/\s+/g, '-'),
+        themeId: existingTheme.id ?? toThemeId(existingTheme.title),
         type: existingTheme.type,
         monthsActive: existingTheme.monthsActive,
         trendDirection: existingTheme.trendDirection,
@@ -1089,6 +1136,68 @@ export function ManageThemes({
 
     return matchesSearch && matchesType;
   });
+
+  const buildStacks = () => {
+    const allOccurrences = filteredGroups.flatMap(group => group.occurrences);
+    const stackMap = new Map<string, ThemeOccurrence[]>();
+
+    allOccurrences.forEach(occurrence => {
+      const stackKey = groupBy === 'theme'
+        ? `${occurrence.themeId}`
+        : groupBy === 'app'
+          ? `${occurrence.appId}`
+          : `${occurrence.themeId}-${occurrence.appId}`;
+      if (!stackMap.has(stackKey)) {
+        stackMap.set(stackKey, []);
+      }
+      stackMap.get(stackKey)!.push(occurrence);
+    });
+
+    const getSortValue = (occurrence: ThemeOccurrence) => {
+      if (typeof occurrence.periodSortOrder === 'number') {
+        return occurrence.periodSortOrder;
+      }
+      const parsed = new Date(occurrence.timePeriod).getTime();
+      return Number.isNaN(parsed) ? 0 : parsed;
+    };
+
+    stackMap.forEach(stack => {
+      stack.sort((a, b) => getSortValue(b) - getSortValue(a));
+    });
+
+    const stacksArray = Array.from(stackMap.entries());
+    const getSortLabel = (occurrences: ThemeOccurrence[]) => {
+      if (sortBy === 'app') {
+        return (occurrences[0]?.appName ?? '').toLowerCase();
+      }
+      return (occurrences[0]?.themeName ?? '').toLowerCase();
+    };
+    stacksArray.sort((aEntry, bEntry) => {
+      const aOccurrences = aEntry[1];
+      const bOccurrences = bEntry[1];
+      if (sortBy === 'group-count') {
+        return bOccurrences.length - aOccurrences.length;
+      }
+      return getSortLabel(aOccurrences).localeCompare(getSortLabel(bOccurrences));
+    });
+    return stacksArray;
+  };
+
+  const stacks = buildStacks();
+  const totalPages = Math.max(1, Math.ceil(stacks.length / pageSize));
+  const pagedStacks = stacks.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+  const startIndex = stacks.length === 0 ? 0 : (currentPage - 1) * pageSize + 1;
+  const endIndex = Math.min(currentPage * pageSize, stacks.length);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, filterApp, filterJourney, filterType, filterStatus, pageSize, groupBy, sortBy]);
+
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [currentPage, totalPages]);
 
   const appOptions = (appCatalog.length
     ? appCatalog
@@ -1314,9 +1423,89 @@ export function ManageThemes({
     setEditScope('single');
   };
 
-  const saveOccurrence = () => {
-    if (editingOccurrence) {
-      setOccurrences(occurrences.map(o => o.id === editingOccurrence.id ? { ...editingOccurrence, updatedAt: new Date().toISOString().split('T')[0] } : o));
+  const saveOccurrence = async () => {
+    if (!editingOccurrence) return;
+
+    setIsSaving(true);
+    setSaveError(null);
+
+    try {
+      const trimmedTitle = editingOccurrence.themeName?.trim() ?? '';
+      if (!trimmedTitle) {
+        setSaveError('Theme title is required.');
+        return;
+      }
+
+      const existingTheme = themeCatalog.find(theme => theme.id === editingOccurrence.themeId);
+      if (existingTheme && existingTheme.title.trim() !== trimmedTitle) {
+        const { error: titleUpdateError } = await supabase
+          .from('themes')
+          .update({ title: trimmedTitle })
+          .eq('id', editingOccurrence.themeId);
+
+        if (titleUpdateError) throw titleUpdateError;
+
+        setThemeCatalog(themeCatalog.map(theme =>
+          theme.id === editingOccurrence.themeId ? { ...theme, title: trimmedTitle } : theme
+        ));
+      }
+
+      const scopeType = editingOccurrence.journeyId
+        ? 'journey'
+        : editingOccurrence.appId
+          ? 'app'
+          : 'portfolio';
+
+      const periodCode = editingOccurrence.periodCode
+        ?? periodOptions.find(period => period.label === editingOccurrence.timePeriod)?.period
+        ?? editingOccurrence.timePeriod;
+
+      const bullets = editingOccurrence.descriptionBullets?.filter(b => b.trim()) ?? [];
+
+      const { error: updateError } = await supabase
+        .from('pain_observations')
+        .update({
+          period: periodCode,
+          theme_id: editingOccurrence.themeId,
+          theme_type: editingOccurrence.type ?? 'negative',
+          status: normalizeStatusForDb(editingOccurrence.status) ?? 'unresolved',
+          months_active: editingOccurrence.monthsActive ?? null,
+          percent_of_feedback: editingOccurrence.percentage ?? null,
+          narrative: bullets[0] ?? null,
+          bullets: bullets.length ? bullets : null,
+          app_id: scopeType === 'app' ? editingOccurrence.appId : null,
+          journey_id: scopeType === 'journey' ? editingOccurrence.journeyId : null,
+          scope_type: scopeType,
+        })
+        .eq('id', Number(editingOccurrence.id));
+
+      if (updateError) throw updateError;
+
+      if (editingOccurrence.appId) {
+        const { error: deleteError } = await supabase
+          .from('pain_observation_apps')
+          .delete()
+          .eq('observation_id', Number(editingOccurrence.id));
+
+        if (deleteError) throw deleteError;
+
+        const { error: linkError } = await supabase
+          .from('pain_observation_apps')
+          .insert({
+            observation_id: Number(editingOccurrence.id),
+            app_id: editingOccurrence.appId,
+          });
+
+        if (linkError) throw linkError;
+      }
+
+      const refreshed = await fetchThemes({
+        periods: fiscalPeriods,
+        apps: appCatalog,
+        journeys: journeyCatalog,
+        themes: themeCatalog,
+      });
+      setOccurrences(refreshed);
       setEditingOccurrenceId(null);
       setEditingOccurrence(null);
       setManualMetadataMode(false);
@@ -1324,6 +1513,57 @@ export function ManageThemes({
       setEditScope('single');
       setSuccessMessage('Theme occurrence updated successfully!');
       setTimeout(() => setSuccessMessage(''), 3000);
+    } catch (error: any) {
+      setSaveError(error?.message ?? 'Failed to update theme.');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const deleteOccurrence = async () => {
+    if (!editingOccurrence) return;
+
+    const confirmed = window.confirm('Delete this theme occurrence? This cannot be undone.');
+    if (!confirmed) return;
+
+    setIsSaving(true);
+    setSaveError(null);
+
+    try {
+      const occurrenceId = Number(editingOccurrence.id);
+
+      const { error: deleteLinksError } = await supabase
+        .from('pain_observation_apps')
+        .delete()
+        .eq('observation_id', occurrenceId);
+
+      if (deleteLinksError) throw deleteLinksError;
+
+      const { error: deleteError } = await supabase
+        .from('pain_observations')
+        .delete()
+        .eq('id', occurrenceId);
+
+      if (deleteError) throw deleteError;
+
+      const refreshed = await fetchThemes({
+        periods: fiscalPeriods,
+        apps: appCatalog,
+        journeys: journeyCatalog,
+        themes: themeCatalog,
+      });
+      setOccurrences(refreshed);
+      setEditingOccurrenceId(null);
+      setEditingOccurrence(null);
+      setManualMetadataMode(false);
+      setThemeSearchQuery('');
+      setEditScope('single');
+      setSuccessMessage('Theme occurrence deleted.');
+      setTimeout(() => setSuccessMessage(''), 3000);
+    } catch (error: any) {
+      setSaveError(error?.message ?? 'Failed to delete theme.');
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -1353,7 +1593,7 @@ export function ManageThemes({
     setShowPreview(true);
   };
 
-  const saveNewOccurrence = async () => {
+  const saveNewOccurrence = async (keepOpen = false) => {
     if (!newOccurrence.themeName || !newOccurrence.percentage || !newOccurrence.descriptionBullets || newOccurrence.descriptionBullets.filter(b => b.trim()).length === 0) {
       return;
     }
@@ -1390,6 +1630,7 @@ export function ManageThemes({
       }
 
       let resolvedThemeId = existingTheme?.id ?? themeId;
+      let nextThemeCatalog = themeCatalog;
 
       if (!existingTheme) {
         const { error: themeInsertError } = await supabase
@@ -1405,6 +1646,9 @@ export function ManageThemes({
         if (themeInsertError) {
           throw themeInsertError;
         }
+        const createdTheme = { id: resolvedThemeId, title: themeTitle, default_type: newOccurrence.type ?? 'negative' };
+        nextThemeCatalog = [...themeCatalog, createdTheme];
+        setThemeCatalog(nextThemeCatalog);
       }
 
       const bullets = newOccurrence.descriptionBullets?.filter(b => b.trim()) ?? [];
@@ -1449,9 +1693,29 @@ export function ManageThemes({
         periods: fiscalPeriods,
         apps: appCatalog,
         journeys: journeyCatalog,
-        themes: themeCatalog,
+        themes: nextThemeCatalog,
       });
       setOccurrences(refreshed);
+
+      if (keepOpen) {
+        setNewOccurrence(prev => ({
+          ...emptyOccurrence,
+          appId: prev.appId,
+          appName: prev.appName,
+          journeyId: prev.journeyId,
+          journeyName: prev.journeyName,
+          periodCode: prev.periodCode,
+          timePeriod: prev.timePeriod,
+          periodSortOrder: prev.periodSortOrder,
+        }));
+        setThemeSearchQuery('');
+        setManualMetadataMode(false);
+        setShowPreview(false);
+        setShowExampleComments(false);
+        setSuccessMessage('Theme saved. Add another.');
+        setTimeout(() => setSuccessMessage(''), 3000);
+        return;
+      }
 
       setIsAddingNew(false);
       setNewOccurrence({ ...emptyOccurrence });
@@ -2580,7 +2844,7 @@ export function ManageThemes({
         {/* Add New Theme Button */}
         <div className="mb-6 flex justify-between items-center">
           <div>
-            <h2 className="text-xl font-semibold text-slate-900">All Themes ({groupedThemes.length})</h2>
+            <h2 className="text-xl font-semibold text-slate-900">All Themes ({stacks.length})</h2>
             <p className="text-sm text-slate-600 mt-1">Manage feedback themes across apps and time periods</p>
           </div>
           {!isAddingNew && !editingOccurrenceId && (
@@ -2712,12 +2976,19 @@ export function ManageThemes({
             </div>
 
             {/* Actions - Bottom Bar */}
-            <div className="flex gap-2 justify-end border-t border-slate-200 p-6 bg-white">
+            <div className="flex flex-wrap gap-2 justify-end border-t border-slate-200 p-6 bg-white">
               <Button variant="outline" onClick={cancelAddingNew}>
                 Cancel
               </Button>
+              <Button
+                variant="outline"
+                onClick={() => saveNewOccurrence(true)}
+                disabled={isSaving}
+              >
+                Save & Add Another
+              </Button>
               <Button 
-                onClick={saveNewOccurrence}
+                onClick={() => saveNewOccurrence(false)}
                 disabled={isSaving}
                 style={{ backgroundColor: '#ff6900', color: 'white' }}
                 className="hover:bg-orange-600"
@@ -2784,42 +3055,61 @@ export function ManageThemes({
                 </Select>
               </div>
             </div>
+            <div className="mt-4 flex flex-wrap items-center gap-4 text-sm text-slate-600">
+              <div className="flex items-center gap-2">
+                <span className="font-medium text-slate-700">Group by</span>
+                <div className="flex items-center gap-1 rounded-md border border-slate-200 bg-slate-50 p-1">
+                  <Button
+                    size="sm"
+                    variant={groupBy === 'theme+app' ? 'default' : 'ghost'}
+                    className={groupBy === 'theme+app' ? 'bg-orange-600 text-white hover:bg-orange-700' : 'text-slate-600'}
+                    onClick={() => setGroupBy('theme+app')}
+                  >
+                    Theme + App
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant={groupBy === 'theme' ? 'default' : 'ghost'}
+                    className={groupBy === 'theme' ? 'bg-orange-600 text-white hover:bg-orange-700' : 'text-slate-600'}
+                    onClick={() => setGroupBy('theme')}
+                  >
+                    Theme
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant={groupBy === 'app' ? 'default' : 'ghost'}
+                    className={groupBy === 'app' ? 'bg-orange-600 text-white hover:bg-orange-700' : 'text-slate-600'}
+                    onClick={() => setGroupBy('app')}
+                  >
+                    App
+                  </Button>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="font-medium text-slate-700">Sort by</span>
+                <Select value={sortBy} onValueChange={(value) => setSortBy(value as typeof sortBy)}>
+                  <SelectTrigger className="h-8 w-[180px]">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="theme">Theme name (A–Z)</SelectItem>
+                    <SelectItem value="group-count">Group count (High–Low)</SelectItem>
+                    <SelectItem value="app">App name (A–Z)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
         </Card>
 
         {/* Themes Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {(() => {
-              // Group occurrences by theme+app for stacking
-              const allOccurrences = filteredGroups.flatMap(group => group.occurrences);
-              const stackMap = new Map<string, ThemeOccurrence[]>();
-              
-              allOccurrences.forEach(occ => {
-                const stackKey = `${occ.themeId}-${occ.appId}`;
-                if (!stackMap.has(stackKey)) {
-                  stackMap.set(stackKey, []);
-                }
-                stackMap.get(stackKey)!.push(occ);
-              });
-              
-              // Sort each stack by time period (most recent first)
-              const getSortValue = (occurrence: ThemeOccurrence) => {
-                if (typeof occurrence.periodSortOrder === 'number') {
-                  return occurrence.periodSortOrder;
-                }
-                const parsed = new Date(occurrence.timePeriod).getTime();
-                return Number.isNaN(parsed) ? 0 : parsed;
-              };
-
-              stackMap.forEach(stack => {
-                stack.sort((a, b) => getSortValue(b) - getSortValue(a));
-              });
-              
-              const stacks = Array.from(stackMap.entries());
-              
-              return stacks.map(([stackKey, stackOccurrences]) => {
+            {pagedStacks.map(([stackKey, stackOccurrences]) => {
                 const isMultiMonth = stackOccurrences.length > 1;
                 const topOccurrence = stackOccurrences[0];
                 const isExpanded = expandedStacks.has(stackKey);
+                const uniqueAppsCount = new Set(stackOccurrences.map(occ => occ.appId)).size;
+                const uniqueThemesCount = new Set(stackOccurrences.map(occ => occ.themeId)).size;
+                const uniqueMonthsCount = new Set(stackOccurrences.map(occ => occ.timePeriod)).size;
                 
                 if (isMultiMonth && !isExpanded) {
                   // Render stacked card with full content
@@ -2837,7 +3127,9 @@ export function ManageThemes({
                         {/* Stack badge */}
                         <div className="absolute top-3 right-3 flex gap-2">
                           <span className="text-xs px-2 py-1 rounded bg-orange-100 text-orange-800 font-semibold border border-orange-300">
-                            {stackOccurrences.length} months
+                            {groupBy === 'theme+app' && `${uniqueMonthsCount} months`}
+                            {groupBy === 'theme' && `${uniqueAppsCount} apps · ${uniqueMonthsCount} months`}
+                            {groupBy === 'app' && `${uniqueThemesCount} themes · ${uniqueMonthsCount} months`}
                           </span>
                         </div>
                         
@@ -2883,10 +3175,16 @@ export function ManageThemes({
 
                           {/* Context Metadata */}
                           <div className="pt-3 border-t border-slate-100 space-y-1.5 text-xs text-slate-600">
-                            {topOccurrence.appName && (
+                            {groupBy === 'theme' && (
+                              <div><strong>Apps:</strong> {uniqueAppsCount}</div>
+                            )}
+                            {groupBy === 'app' && (
+                              <div><strong>Themes:</strong> {uniqueThemesCount}</div>
+                            )}
+                            {groupBy !== 'theme' && topOccurrence.appName && (
                               <div><strong>App:</strong> {topOccurrence.appName}</div>
                             )}
-                            {topOccurrence.journeyName && (
+                            {groupBy !== 'theme' && topOccurrence.journeyName && (
                               <div><strong>Journey:</strong> {topOccurrence.journeyName}</div>
                             )}
                             <div><strong>Period:</strong> {topOccurrence.timePeriod}</div>
@@ -2924,7 +3222,12 @@ export function ManageThemes({
 
                           {/* Expand hint */}
                           <div className="pt-3 border-t border-slate-100 text-xs text-orange-600 font-medium flex items-center gap-1">
-                            <span>Click to expand {stackOccurrences.length} months</span>
+                            <span>
+                              Click to expand
+                              {groupBy === 'theme+app' && ` ${uniqueMonthsCount} months`}
+                              {groupBy === 'theme' && ` ${uniqueAppsCount} apps / ${uniqueMonthsCount} months`}
+                              {groupBy === 'app' && ` ${uniqueThemesCount} themes / ${uniqueMonthsCount} months`}
+                            </span>
                             <ChevronDown className="size-3" />
                           </div>
                         </div>
@@ -2947,7 +3250,15 @@ export function ManageThemes({
                           Collapse Stack
                         </Button>
                         <span className="text-sm text-slate-600">
-                          <strong>{topOccurrence.themeName}</strong> in <strong>{topOccurrence.appName}</strong> across {stackOccurrences.length} months
+                          {groupBy === 'theme+app' && (
+                            <> <strong>{topOccurrence.themeName}</strong> in <strong>{topOccurrence.appName}</strong> across {uniqueMonthsCount} months</>
+                          )}
+                          {groupBy === 'theme' && (
+                            <> <strong>{topOccurrence.themeName}</strong> across {uniqueAppsCount} apps and {uniqueMonthsCount} months</>
+                          )}
+                          {groupBy === 'app' && (
+                            <> <strong>{topOccurrence.appName}</strong> across {uniqueThemesCount} themes and {uniqueMonthsCount} months</>
+                          )}
                         </span>
                       </div>
                       
@@ -3051,7 +3362,7 @@ export function ManageThemes({
                 } else {
                   // Render single card (no stacking)
                   const occurrence = topOccurrence;
-                  return (
+                return (
               <Card key={occurrence.id} className="p-4 hover:shadow-md transition-shadow relative">
                 {/* Edit Button - Top Right */}
                 <div className="absolute top-3 right-3">
@@ -3102,10 +3413,16 @@ export function ManageThemes({
 
                   {/* Context Metadata */}
                   <div className="pt-3 border-t border-slate-100 space-y-1.5 text-xs text-slate-600">
-                    {occurrence.appName && (
+                    {groupBy === 'theme' && (
+                      <div><strong>Apps:</strong> {uniqueAppsCount}</div>
+                    )}
+                    {groupBy === 'app' && (
+                      <div><strong>Themes:</strong> {uniqueThemesCount}</div>
+                    )}
+                    {groupBy !== 'theme' && occurrence.appName && (
                       <div><strong>App:</strong> {occurrence.appName}</div>
                     )}
-                    {occurrence.journeyName && (
+                    {groupBy !== 'theme' && occurrence.journeyName && (
                       <div><strong>Journey:</strong> {occurrence.journeyName}</div>
                     )}
                     <div><strong>Period:</strong> {occurrence.timePeriod}</div>
@@ -3144,15 +3461,58 @@ export function ManageThemes({
               </Card>
             );
           }
-        });
-      })()}
+        })}
 
-            {filteredGroups.length === 0 && (
+            {stacks.length === 0 && (
               <div className="col-span-full text-center py-12 text-slate-500">
                 No themes found. Try adjusting your filters or create a new theme.
               </div>
             )}
         </div>
+
+        {stacks.length > 25 && (
+          <div className="mt-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div className="text-sm text-slate-600">
+              Showing {startIndex}-{endIndex} of {stacks.length} themes
+            </div>
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2 text-sm text-slate-600">
+                <span>Per page</span>
+                <Select value={String(pageSize)} onValueChange={(value) => setPageSize(Number(value))}>
+                  <SelectTrigger className="h-8 w-[92px]">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="25">25</SelectItem>
+                    <SelectItem value="50">50</SelectItem>
+                    <SelectItem value="100">100</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
+                  disabled={currentPage <= 1}
+                >
+                  Prev
+                </Button>
+                <div className="text-sm text-slate-600">
+                  Page {currentPage} of {totalPages}
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}
+                  disabled={currentPage >= totalPages}
+                >
+                  Next
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Edit Theme Modal */}
         {editingOccurrenceId && editingOccurrence && (
@@ -3404,18 +3764,28 @@ export function ManageThemes({
               </div>
 
               {/* Actions - Bottom Bar */}
-              <div className="flex gap-2 justify-end border-t border-slate-200 p-6 bg-white">
-                <Button variant="outline" onClick={cancelEditing}>
-                  Cancel
-                </Button>
-                <Button 
-                  onClick={saveOccurrence}
-                  disabled={!editingOccurrence?.themeName || editingOccurrence.themeName.trim() === '' || !editingOccurrence.percentage}
-                  style={{ backgroundColor: '#ff6900' }}
-                  className="text-white hover:opacity-90 disabled:opacity-50"
+              <div className="flex items-center justify-between gap-3 border-t border-slate-200 p-6 bg-white">
+                <Button
+                  variant="outline"
+                  className="text-red-600 border-red-200 hover:bg-red-50"
+                  onClick={deleteOccurrence}
                 >
-                  Save Changes
+                  <Trash2 className="size-4 mr-2" />
+                  Delete
                 </Button>
+                <div className="flex gap-2">
+                  <Button variant="outline" onClick={cancelEditing}>
+                    Cancel
+                  </Button>
+                  <Button 
+                    onClick={saveOccurrence}
+                    disabled={isSaving || !editingOccurrence?.themeName || editingOccurrence.themeName.trim() === '' || !editingOccurrence.percentage}
+                    style={{ backgroundColor: '#ff6900' }}
+                    className="text-white hover:opacity-90 active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {isSaving ? 'Saving...' : 'Save Changes'}
+                  </Button>
+                </div>
               </div>
             </Card>
           </div>
