@@ -1,13 +1,12 @@
 import { FileText, Database, Map, Settings, Lock } from 'lucide-react';
 
 interface AdminTabNavProps {
-  activeTab: 'submit' | 'manage-themes' | 'manage-journeys' | 'manage-apps' | 'settings';
-  onTabChange: (tab: 'submit' | 'manage-themes' | 'manage-journeys' | 'manage-apps' | 'settings') => void;
+  activeTab: 'manage-themes' | 'manage-journeys' | 'manage-apps' | 'settings';
+  onTabChange: (tab: 'manage-themes' | 'manage-journeys' | 'manage-apps' | 'settings') => void;
 }
 
 export function AdminTabNav({ activeTab, onTabChange }: AdminTabNavProps) {
   const tabs = [
-    { id: 'submit' as const, label: 'Submit New Themes', icon: FileText },
     { id: 'manage-themes' as const, label: 'Manage Themes', icon: Database },
     { id: 'manage-journeys' as const, label: 'Manage Journeys', icon: Map },
     { id: 'manage-apps' as const, label: 'Manage Apps', icon: Settings },

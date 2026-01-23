@@ -813,11 +813,11 @@ export function AdminThemesView({
                     </div>
                   </div>
 
-                  {/* Description Bullets */}
+                  {/* Summary Points */}
                   <div className="space-y-3">
                     <div className="flex items-center justify-between">
                       <Label>
-                        Description Bullets <span className="text-red-600">*</span>
+                        Summary Points <span className="text-red-600">*</span>
                         <span className="text-xs font-normal text-slate-500 ml-2">(2-3 recommended)</span>
                       </Label>
                       <Button

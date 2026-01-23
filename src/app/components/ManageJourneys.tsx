@@ -5,7 +5,7 @@ import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Textarea } from './ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
-import { Plus, Edit2, Save, X, ChevronDown, ChevronUp, Trash2, GripVertical, ArrowRight, Eye } from 'lucide-react';
+import { Plus, Edit2, Save, X, ChevronDown, ChevronUp, Trash2, GripVertical, ArrowRight, Eye, Clock, CheckCircle, XCircle } from 'lucide-react';
 import { mockApps, getScoreColor } from '../data/mockData';
 import { AdminTabNav } from './AdminTabNav';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
@@ -16,7 +16,7 @@ interface ManageJourneysProps {
   onNavigateAllApps: () => void;
   onNavigateKeyJourneys: () => void;
   onNavigateTopPains: () => void;
-  onTabChange: (tab: 'submit' | 'manage-themes' | 'manage-journeys' | 'manage-apps' | 'settings') => void;
+  onTabChange: (tab: 'manage-themes' | 'manage-journeys' | 'manage-apps' | 'settings') => void;
 }
 
 interface JourneyStep {
@@ -624,115 +624,135 @@ export function ManageJourneys({
 
         {/* Add New Journey Form */}
         {isAddingNew && (
-          <Card className="p-6 mb-6 border-2 border-[#ff6900]">
-            <h3 className="text-lg font-semibold text-slate-900 mb-4">Create New Journey</h3>
-            <div className="space-y-6">
-              <div className="space-y-2">
-                <Label htmlFor="newName">
-                  Journey Name <span className="text-red-600">*</span>
-                </Label>
-                <Input
-                  id="newName"
-                  value={newJourney.name || ''}
-                  onChange={(e) => updateNewJourney('name', e.target.value)}
-                  placeholder="e.g., Schedule Patient Visit"
-                />
-              </div>
+          <Card className="mb-6 border-2 border-[#ff6900] overflow-hidden">
+            {/* Header */}
+            <div className="flex items-center justify-between border-b border-slate-200 p-6 bg-white">
+              <h3 className="text-lg font-semibold text-slate-900">Create New Journey</h3>
+              <Button variant="ghost" size="sm" onClick={cancelAddingNew}>
+                <X className="size-4" />
+              </Button>
+            </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="newDescription">Description (Optional)</Label>
-                <Textarea
-                  id="newDescription"
-                  value={newJourney.description || ''}
-                  onChange={(e) => updateNewJourney('description', e.target.value)}
-                  placeholder="Describe this journey..."
-                  rows={3}
-                />
-              </div>
+            <div className="flex">
+              {/* Left Panel - Form */}
+              <div className="flex-1 p-6 border-r border-slate-200 bg-white space-y-6">
+                {/* Basic Information Section */}
+                <div>
+                  <h4 className="text-sm font-semibold text-slate-900 mb-4">Basic Information</h4>
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="newName">
+                        Journey Name <span className="text-red-600">*</span>
+                      </Label>
+                      <Input
+                        id="newName"
+                        value={newJourney.name || ''}
+                        onChange={(e) => updateNewJourney('name', e.target.value)}
+                        placeholder="e.g., Schedule Patient Visit"
+                      />
+                    </div>
 
-              {/* Collection Status and Frequency */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="newStatus">
-                    Collection Status <span className="text-red-600">*</span>
-                  </Label>
-                  <Select
-                    value={newJourney.status || 'pending'}
-                    onValueChange={(value: any) => updateNewJourney('status', value)}
-                  >
-                    <SelectTrigger id="newStatus">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="pending">Pending - Not Yet Collecting Data</SelectItem>
-                      <SelectItem value="active">Active - Currently Collecting Data</SelectItem>
-                      <SelectItem value="inactive">Inactive - No Longer Being Measured</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                {(newJourney.status === 'pending' || newJourney.status === 'active') && (
-                  <div className="space-y-2">
-                    <Label htmlFor="newFrequency">
-                      Collection Frequency <span className="text-red-600">*</span>
-                    </Label>
-                    <Select
-                      value={newJourney.collectionFrequency || 'monthly'}
-                      onValueChange={(value: any) => updateNewJourney('collectionFrequency', value)}
-                    >
-                      <SelectTrigger id="newFrequency">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="weekly">Weekly</SelectItem>
-                        <SelectItem value="bi-weekly">Bi-weekly</SelectItem>
-                        <SelectItem value="monthly">Monthly</SelectItem>
-                        <SelectItem value="quarterly">Quarterly</SelectItem>
-                        <SelectItem value="semi-annually">Semi-annually</SelectItem>
-                        <SelectItem value="annually">Annually</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                )}
-              </div>
-
-              {newJourney.status === 'inactive' && (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="newMeasuredStart">
-                      Measured From <span className="text-red-600">*</span>
-                    </Label>
-                    <Input
-                      id="newMeasuredStart"
-                      type="month"
-                      value={newJourney.measuredStartDate || ''}
-                      onChange={(e) => updateNewJourney('measuredStartDate', e.target.value)}
-                      placeholder="e.g., 2024-01"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="newMeasuredEnd">
-                      Measured Until <span className="text-red-600">*</span>
-                    </Label>
-                    <Input
-                      id="newMeasuredEnd"
-                      type="month"
-                      value={newJourney.measuredEndDate || ''}
-                      onChange={(e) => updateNewJourney('measuredEndDate', e.target.value)}
-                      placeholder="e.g., 2024-07"
-                    />
+                    <div className="space-y-2">
+                      <Label htmlFor="newDescription">Description (Optional)</Label>
+                      <Textarea
+                        id="newDescription"
+                        value={newJourney.description || ''}
+                        onChange={(e) => updateNewJourney('description', e.target.value)}
+                        placeholder="Describe this journey..."
+                        rows={3}
+                      />
+                    </div>
                   </div>
                 </div>
-              )}
+
+                {/* Collection Settings Section */}
+                <div>
+                  <h4 className="text-sm font-semibold text-slate-900 mb-4">Collection Settings</h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="newStatus">
+                        Collection Status <span className="text-red-600">*</span>
+                      </Label>
+                      <Select
+                        value={newJourney.status || 'pending'}
+                        onValueChange={(value: any) => updateNewJourney('status', value)}
+                      >
+                        <SelectTrigger id="newStatus">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="pending">Pending - Not Yet Collecting Data</SelectItem>
+                          <SelectItem value="active">Active - Currently Collecting Data</SelectItem>
+                          <SelectItem value="inactive">Inactive - No Longer Being Measured</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    {(newJourney.status === 'pending' || newJourney.status === 'active') && (
+                      <div className="space-y-2">
+                        <Label htmlFor="newFrequency">
+                          Collection Frequency <span className="text-red-600">*</span>
+                        </Label>
+                        <Select
+                          value={newJourney.collectionFrequency || 'monthly'}
+                          onValueChange={(value: any) => updateNewJourney('collectionFrequency', value)}
+                        >
+                          <SelectTrigger id="newFrequency">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="weekly">Weekly</SelectItem>
+                            <SelectItem value="bi-weekly">Bi-weekly</SelectItem>
+                            <SelectItem value="monthly">Monthly</SelectItem>
+                            <SelectItem value="quarterly">Quarterly</SelectItem>
+                            <SelectItem value="semi-annually">Semi-annually</SelectItem>
+                            <SelectItem value="annually">Annually</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    )}
+                  </div>
+
+                  {newJourney.status === 'inactive' && (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="newMeasuredStart">
+                          Measured From <span className="text-red-600">*</span>
+                        </Label>
+                        <Input
+                          id="newMeasuredStart"
+                          type="month"
+                          value={newJourney.measuredStartDate || ''}
+                          onChange={(e) => updateNewJourney('measuredStartDate', e.target.value)}
+                          placeholder="e.g., 2024-01"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="newMeasuredEnd">
+                          Measured Until <span className="text-red-600">*</span>
+                        </Label>
+                        <Input
+                          id="newMeasuredEnd"
+                          type="month"
+                          value={newJourney.measuredEndDate || ''}
+                          onChange={(e) => updateNewJourney('measuredEndDate', e.target.value)}
+                          placeholder="e.g., 2024-07"
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
 
               <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <Label>
-                    Journey Steps <span className="text-red-600">*</span>
-                    <span className="text-sm text-slate-500 font-normal ml-2">
-                      Define the sequential steps in this journey
-                    </span>
-                  </Label>
+                <div className="flex items-start justify-between">
+                  <div>
+                    <h4 className="text-sm font-semibold text-slate-900">
+                      Define Journey Steps <span className="text-red-600">*</span>
+                    </h4>
+                    <p className="text-xs text-slate-500 mt-1">
+                      Add the sequential steps that make up this journey
+                    </p>
+                  </div>
                   <Button
                     type="button"
                     variant="outline"
@@ -903,36 +923,95 @@ export function ManageJourneys({
                   </div>
                 ))}
 
-                {(newJourney.steps || []).length > 0 && (
-                  <p className="text-xs text-slate-500">
-                    {(newJourney.steps || []).length} step(s) • {getUniqueApps(newJourney.steps || []).length} unique app(s)
-                  </p>
-                )}
+                </div>
               </div>
 
-              <div className="flex justify-end gap-3 pt-4 border-t">
-                <Button variant="outline" onClick={cancelAddingNew}>
-                  Cancel
-                </Button>
-                <Button 
-                  variant="outline"
-                  onClick={() => openPreview(newJourney)}
-                  disabled={!newJourney.name || newJourney.name.trim() === '' || !newJourney.steps || newJourney.steps.length === 0}
-                  className="text-orange-600 border-orange-600 hover:bg-orange-50"
-                >
-                  <Eye className="size-4 mr-2" />
-                  Preview
-                </Button>
-                <Button
-                  onClick={saveNewJourney}
-                  disabled={!newJourney.name || newJourney.name.trim() === '' || !newJourney.steps || newJourney.steps.length === 0}
-                  style={{ backgroundColor: '#ff6900' }}
-                  className="text-white hover:opacity-90 disabled:opacity-50"
-                >
-                  <Save className="size-4 mr-2" />
-                  Create Journey
-                </Button>
+              {/* Right Panel - Live Preview */}
+              <div className="w-[350px] bg-slate-50 p-6">
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2 mb-4">
+                    <Eye className="size-4 text-slate-600" />
+                    <h3 className="text-sm font-semibold text-slate-900">Live Preview</h3>
+                  </div>
+
+                  {/* Journey Preview Card */}
+                  <div className="bg-white rounded-lg border border-slate-200 p-4 space-y-4">
+                    {/* Journey Name */}
+                    <div>
+                      <div className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Journey Name</div>
+                      <div className="text-base font-medium text-slate-900">
+                        {newJourney.name && newJourney.name.trim() !== '' ? newJourney.name : <span className="italic text-slate-400">Untitled Journey</span>}
+                      </div>
+                    </div>
+
+                    {/* Status and Frequency */}
+                    <div className="grid grid-cols-2 gap-3 pt-3 border-t border-slate-100">
+                      <div>
+                        <div className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Status</div>
+                        <div>
+                          {newJourney.status === 'pending' && (
+                            <span className="inline-flex items-center gap-1 px-2 py-1 rounded bg-amber-100 text-amber-800 text-xs font-medium">
+                              <Clock className="size-3" /> Pending
+                            </span>
+                          )}
+                          {newJourney.status === 'active' && (
+                            <span className="inline-flex items-center gap-1 px-2 py-1 rounded bg-green-100 text-green-800 text-xs font-medium">
+                              <CheckCircle className="size-3" /> Active
+                            </span>
+                          )}
+                          {newJourney.status === 'inactive' && (
+                            <span className="inline-flex items-center gap-1 px-2 py-1 rounded bg-slate-100 text-slate-700 text-xs font-medium">
+                              <XCircle className="size-3" /> Inactive
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <div>
+                        <div className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Frequency</div>
+                        <div className="text-xs text-slate-700 capitalize">
+                          {newJourney.collectionFrequency || 'Monthly'}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Journey Flow */}
+                    <div className="pt-3 border-t border-slate-100">
+                      <div className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">
+                        Journey Flow ({(newJourney.steps || []).length} Steps)
+                      </div>
+                      {(newJourney.steps || []).length === 0 ? (
+                        <p className="text-xs text-slate-400 italic text-center py-4">No steps added yet</p>
+                      ) : (
+                        <div className="space-y-1">
+                          {(newJourney.steps || []).map((step, idx) => (
+                            <div key={step.id} className="flex items-center gap-2 text-xs">
+                              <span className="flex items-center justify-center size-5 rounded-full bg-[#ff6900] text-white font-semibold text-[10px]">
+                                {step.stepNumber}
+                              </span>
+                              <span className="text-slate-700 font-medium">{step.name || `Step ${step.stepNumber}`}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
               </div>
+            </div>
+
+            {/* Actions - Bottom Bar */}
+            <div className="flex gap-2 justify-end border-t border-slate-200 p-6 bg-white">
+              <Button variant="outline" onClick={cancelAddingNew}>
+                Cancel
+              </Button>
+              <Button
+                onClick={saveNewJourney}
+                disabled={!newJourney.name || newJourney.name.trim() === '' || !newJourney.steps || newJourney.steps.length === 0}
+                style={{ backgroundColor: '#ff6900' }}
+                className="text-white hover:opacity-90 disabled:opacity-50"
+              >
+                Create Journey
+              </Button>
             </div>
           </Card>
         )}
@@ -1007,113 +1086,143 @@ export function ManageJourneys({
                   {isExpanded && (
                     <div className="border-t border-slate-200 p-6 bg-slate-50">
                       {isEditing ? (
-                        <div className="space-y-6">
-                          {/* Editing Mode */}
-                          <div className="space-y-2">
-                            <Label>Journey Name</Label>
-                            <Input
-                              value={currentJourney.name}
-                              onChange={(e) => updateEditingJourney('name', e.target.value)}
-                            />
+                        /* Edit Mode - Full Screen Modal-like Experience */
+                        <Card className="border-2 border-[#ff6900] overflow-hidden -m-6">
+                          {/* Header */}
+                          <div className="flex items-center justify-between border-b border-slate-200 p-6 bg-white">
+                            <h3 className="text-lg font-semibold text-slate-900">Edit Journey</h3>
+                            <Button variant="ghost" size="sm" onClick={cancelEditing}>
+                              <X className="size-4" />
+                            </Button>
                           </div>
 
-                          <div className="space-y-2">
-                            <Label>Description</Label>
-                            <Textarea
-                              value={currentJourney.description || ''}
-                              onChange={(e) => updateEditingJourney('description', e.target.value)}
-                              rows={3}
-                            />
-                          </div>
+                          <div className="flex">
+                            {/* Left Panel - Form */}
+                            <div className="flex-1 p-6 border-r border-slate-200 bg-white space-y-6">
+                              {/* Basic Information Section */}
+                              <div>
+                                <h4 className="text-sm font-semibold text-slate-900 mb-4">Basic Information</h4>
+                                <div className="space-y-4">
+                                  <div className="space-y-2">
+                                    <Label>Journey Name <span className="text-red-600">*</span></Label>
+                                    <Input
+                                      value={currentJourney.name}
+                                      onChange={(e) => updateEditingJourney('name', e.target.value)}
+                                      placeholder="e.g., Schedule Patient Visit"
+                                    />
+                                  </div>
 
-                          {/* Collection Status and Frequency */}
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div className="space-y-2">
-                              <Label htmlFor="editStatus">
-                                Collection Status <span className="text-red-600">*</span>
-                              </Label>
-                              <Select
-                                value={currentJourney.status || 'pending'}
-                                onValueChange={(value: any) => updateEditingJourney('status', value)}
-                              >
-                                <SelectTrigger id="editStatus">
-                                  <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="pending">Pending - Not Yet Collecting Data</SelectItem>
-                                  <SelectItem value="active">Active - Currently Collecting Data</SelectItem>
-                                  <SelectItem value="inactive">Inactive - No Longer Being Measured</SelectItem>
-                                </SelectContent>
-                              </Select>
-                            </div>
-
-                            {(currentJourney.status === 'pending' || currentJourney.status === 'active') && (
-                              <div className="space-y-2">
-                                <Label htmlFor="editFrequency">
-                                  Collection Frequency <span className="text-red-600">*</span>
-                                </Label>
-                                <Select
-                                  value={currentJourney.collectionFrequency || 'monthly'}
-                                  onValueChange={(value: any) => updateEditingJourney('collectionFrequency', value)}
-                                >
-                                  <SelectTrigger id="editFrequency">
-                                    <SelectValue />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    <SelectItem value="weekly">Weekly</SelectItem>
-                                    <SelectItem value="bi-weekly">Bi-weekly</SelectItem>
-                                    <SelectItem value="monthly">Monthly</SelectItem>
-                                    <SelectItem value="quarterly">Quarterly</SelectItem>
-                                    <SelectItem value="semi-annually">Semi-annually</SelectItem>
-                                    <SelectItem value="annually">Annually</SelectItem>
-                                  </SelectContent>
-                                </Select>
+                                  <div className="space-y-2">
+                                    <Label>Description (Optional)</Label>
+                                    <Textarea
+                                      value={currentJourney.description || ''}
+                                      onChange={(e) => updateEditingJourney('description', e.target.value)}
+                                      placeholder="Describe this journey..."
+                                      rows={3}
+                                    />
+                                  </div>
+                                </div>
                               </div>
-                            )}
-                          </div>
 
-                          {currentJourney.status === 'inactive' && (
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                              <div className="space-y-2">
-                                <Label htmlFor="editMeasuredStart">
-                                  Measured From <span className="text-red-600">*</span>
-                                </Label>
-                                <Input
-                                  id="editMeasuredStart"
-                                  type="month"
-                                  value={currentJourney.measuredStartDate || ''}
-                                  onChange={(e) => updateEditingJourney('measuredStartDate', e.target.value)}
-                                  placeholder="e.g., 2024-01"
-                                />
-                              </div>
-                              <div className="space-y-2">
-                                <Label htmlFor="editMeasuredEnd">
-                                  Measured Until <span className="text-red-600">*</span>
-                                </Label>
-                                <Input
-                                  id="editMeasuredEnd"
-                                  type="month"
-                                  value={currentJourney.measuredEndDate || ''}
-                                  onChange={(e) => updateEditingJourney('measuredEndDate', e.target.value)}
-                                  placeholder="e.g., 2024-07"
-                                />
-                              </div>
-                            </div>
-                          )}
+                              {/* Collection Settings Section */}
+                              <div>
+                                <h4 className="text-sm font-semibold text-slate-900 mb-4">Collection Settings</h4>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                  <div className="space-y-2">
+                                    <Label htmlFor="editStatus">
+                                      Collection Status <span className="text-red-600">*</span>
+                                    </Label>
+                                    <Select
+                                      value={currentJourney.status || 'pending'}
+                                      onValueChange={(value: any) => updateEditingJourney('status', value)}
+                                    >
+                                      <SelectTrigger id="editStatus">
+                                        <SelectValue />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        <SelectItem value="pending">Pending - Not Yet Collecting Data</SelectItem>
+                                        <SelectItem value="active">Active - Currently Collecting Data</SelectItem>
+                                        <SelectItem value="inactive">Inactive - No Longer Being Measured</SelectItem>
+                                      </SelectContent>
+                                    </Select>
+                                  </div>
 
-                          <div className="space-y-3">
-                            <div className="flex items-center justify-between">
-                              <Label>Journey Steps</Label>
-                              <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                onClick={addStepToEditing}
-                              >
-                                <Plus className="size-4 mr-1" />
-                                Add Step
-                              </Button>
-                            </div>
+                                  {(currentJourney.status === 'pending' || currentJourney.status === 'active') && (
+                                    <div className="space-y-2">
+                                      <Label htmlFor="editFrequency">
+                                        Collection Frequency <span className="text-red-600">*</span>
+                                      </Label>
+                                      <Select
+                                        value={currentJourney.collectionFrequency || 'monthly'}
+                                        onValueChange={(value: any) => updateEditingJourney('collectionFrequency', value)}
+                                      >
+                                        <SelectTrigger id="editFrequency">
+                                          <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                          <SelectItem value="weekly">Weekly</SelectItem>
+                                          <SelectItem value="bi-weekly">Bi-weekly</SelectItem>
+                                          <SelectItem value="monthly">Monthly</SelectItem>
+                                          <SelectItem value="quarterly">Quarterly</SelectItem>
+                                          <SelectItem value="semi-annually">Semi-annually</SelectItem>
+                                          <SelectItem value="annually">Annually</SelectItem>
+                                        </SelectContent>
+                                      </Select>
+                                    </div>
+                                  )}
+                                </div>
+
+                                {currentJourney.status === 'inactive' && (
+                                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                                    <div className="space-y-2">
+                                      <Label htmlFor="editMeasuredStart">
+                                        Measured From <span className="text-red-600">*</span>
+                                      </Label>
+                                      <Input
+                                        id="editMeasuredStart"
+                                        type="month"
+                                        value={currentJourney.measuredStartDate || ''}
+                                        onChange={(e) => updateEditingJourney('measuredStartDate', e.target.value)}
+                                        placeholder="e.g., 2024-01"
+                                      />
+                                    </div>
+                                    <div className="space-y-2">
+                                      <Label htmlFor="editMeasuredEnd">
+                                        Measured Until <span className="text-red-600">*</span>
+                                      </Label>
+                                      <Input
+                                        id="editMeasuredEnd"
+                                        type="month"
+                                        value={currentJourney.measuredEndDate || ''}
+                                        onChange={(e) => updateEditingJourney('measuredEndDate', e.target.value)}
+                                        placeholder="e.g., 2024-07"
+                                      />
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+
+                              {/* Define Journey Steps Section */}
+                              <div className="space-y-3">
+                                <div className="flex items-start justify-between">
+                                  <div>
+                                    <h4 className="text-sm font-semibold text-slate-900">
+                                      Define Journey Steps <span className="text-red-600">*</span>
+                                    </h4>
+                                    <p className="text-xs text-slate-500 mt-1">
+                                      Add the sequential steps that make up this journey
+                                    </p>
+                                  </div>
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={addStepToEditing}
+                                  >
+                                    <Plus className="size-4 mr-1" />
+                                    Add Step
+                                  </Button>
+                                </div>
 
                             {currentJourney.steps.map((step, index) => (
                               <div key={step.id}>
@@ -1272,30 +1381,96 @@ export function ManageJourneys({
                               </div>
                             ))}
                           </div>
+                            </div>
 
-                          <div className="flex justify-end gap-3 pt-4 border-t">
+                            {/* Right Panel - Live Preview */}
+                            <div className="w-[350px] bg-slate-50 p-6">
+                              <div className="space-y-4">
+                                <div className="flex items-center gap-2 mb-4">
+                                  <Eye className="size-4 text-slate-600" />
+                                  <h3 className="text-sm font-semibold text-slate-900">Live Preview</h3>
+                                </div>
+
+                                {/* Journey Preview Card */}
+                                <div className="bg-white rounded-lg border border-slate-200 p-4 space-y-4">
+                                  {/* Journey Name */}
+                                  <div>
+                                    <div className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Journey Name</div>
+                                    <div className="text-base font-medium text-slate-900">
+                                      {currentJourney.name && currentJourney.name.trim() !== '' ? currentJourney.name : <span className="italic text-slate-400">Untitled Journey</span>}
+                                    </div>
+                                  </div>
+
+                                  {/* Status and Frequency */}
+                                  <div className="grid grid-cols-2 gap-3 pt-3 border-t border-slate-100">
+                                    <div>
+                                      <div className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Status</div>
+                                      <div>
+                                        {currentJourney.status === 'pending' && (
+                                          <span className="inline-flex items-center gap-1 px-2 py-1 rounded bg-amber-100 text-amber-800 text-xs font-medium">
+                                            <Clock className="size-3" /> Pending
+                                          </span>
+                                        )}
+                                        {currentJourney.status === 'active' && (
+                                          <span className="inline-flex items-center gap-1 px-2 py-1 rounded bg-green-100 text-green-800 text-xs font-medium">
+                                            <CheckCircle className="size-3" /> Active
+                                          </span>
+                                        )}
+                                        {currentJourney.status === 'inactive' && (
+                                          <span className="inline-flex items-center gap-1 px-2 py-1 rounded bg-slate-100 text-slate-700 text-xs font-medium">
+                                            <XCircle className="size-3" /> Inactive
+                                          </span>
+                                        )}
+                                      </div>
+                                    </div>
+                                    <div>
+                                      <div className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Frequency</div>
+                                      <div className="text-xs text-slate-700 capitalize">
+                                        {currentJourney.collectionFrequency || 'Monthly'}
+                                      </div>
+                                    </div>
+                                  </div>
+
+                                  {/* Journey Flow */}
+                                  <div className="pt-3 border-t border-slate-100">
+                                    <div className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">
+                                      Journey Flow ({currentJourney.steps.length} Steps)
+                                    </div>
+                                    {currentJourney.steps.length === 0 ? (
+                                      <p className="text-xs text-slate-400 italic text-center py-4">No steps added yet</p>
+                                    ) : (
+                                      <div className="space-y-1">
+                                        {currentJourney.steps.map((step, idx) => (
+                                          <div key={step.id} className="flex items-center gap-2 text-xs">
+                                            <span className="flex items-center justify-center size-5 rounded-full bg-[#ff6900] text-white font-semibold text-[10px]">
+                                              {step.stepNumber}
+                                            </span>
+                                            <span className="text-slate-700 font-medium">{step.name || `Step ${step.stepNumber}`}</span>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Actions - Bottom Bar */}
+                          <div className="flex gap-2 justify-end border-t border-slate-200 p-6 bg-white">
                             <Button variant="outline" onClick={cancelEditing}>
                               Cancel
                             </Button>
                             <Button 
-                              variant="outline"
-                              onClick={() => editingJourney && openPreview(editingJourney)}
-                              disabled={!editingJourney?.name || editingJourney.name.trim() === '' || !editingJourney.steps || editingJourney.steps.length === 0}
-                              className="text-orange-600 border-orange-600 hover:bg-orange-50"
-                            >
-                              <Eye className="size-4 mr-2" />
-                              Preview
-                            </Button>
-                            <Button 
                               onClick={saveJourney}
+                              disabled={!currentJourney.name || currentJourney.name.trim() === '' || currentJourney.steps.length === 0}
                               style={{ backgroundColor: '#ff6900' }}
-                              className="text-white hover:opacity-90"
+                              className="text-white hover:opacity-90 disabled:opacity-50"
                             >
-                              <Save className="size-4 mr-2" />
                               Save Changes
                             </Button>
                           </div>
-                        </div>
+                        </Card>
                       ) : (
                         <div className="space-y-4">
                           {/* View Mode */}
@@ -1342,15 +1517,15 @@ export function ManageJourneys({
                           <div className="grid grid-cols-2 md:grid-cols-3 gap-4 pt-4 border-t">
                             <div>
                               <div className="text-xs text-slate-500">Total Steps</div>
-                              <div className="text-sm font-semibold text-slate-900">{journey.steps.length}</div>
+                              <div className="text-sm font-semibold text-slate-400">{journey.steps.length}</div>
                             </div>
                             <div>
                               <div className="text-xs text-slate-500">Unique Apps</div>
-                              <div className="text-sm font-semibold text-slate-900">{uniqueApps.length}</div>
+                              <div className="text-sm font-semibold text-slate-400">{uniqueApps.length}</div>
                             </div>
                             <div>
                               <div className="text-xs text-slate-500">Created</div>
-                              <div className="text-sm font-semibold text-slate-900">{journey.createdAt}</div>
+                              <div className="text-sm font-semibold text-slate-400">{journey.createdAt}</div>
                             </div>
                           </div>
                         </div>
@@ -1721,17 +1896,17 @@ export function ManageJourneys({
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                     <div>
                       <div className="text-xs text-slate-500">Total Steps</div>
-                      <div className="text-lg font-semibold text-slate-900">{previewJourney.steps.length}</div>
+                      <div className="text-lg font-semibold text-slate-400">{previewJourney.steps.length}</div>
                     </div>
                     <div>
                       <div className="text-xs text-slate-500">Unique Apps</div>
-                      <div className="text-lg font-semibold text-slate-900">
+                      <div className="text-lg font-semibold text-slate-400">
                         {new Set(previewJourney.steps.map(s => s.appId)).size}
                       </div>
                     </div>
                     <div>
                       <div className="text-xs text-slate-500">Description</div>
-                      <div className="text-sm text-slate-900">
+                      <div className="text-sm text-slate-400">
                         {previewJourney.description || 'No description provided'}
                       </div>
                     </div>

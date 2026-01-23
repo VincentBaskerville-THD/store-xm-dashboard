@@ -9,7 +9,6 @@ import { AllJourneysView } from './components/AllJourneysView';
 import { TimeSeriesView } from './components/TimeSeriesView';
 import { AllAppsTimeGrid } from './components/AllAppsTimeGrid';
 import { TopPains } from './components/TopPains';
-import { AdminThemesView } from './components/AdminThemesView';
 import { ManageThemes } from './components/ManageThemes';
 import { ManageJourneys } from './components/ManageJourneys';
 import { ManageApps } from './components/ManageApps';
@@ -29,7 +28,6 @@ export type ViewType =
   | 'apps-time-grid-executive'
   | 'apps-time-grid-practitioner'
   | 'top-pains'
-  | 'admin-themes'
   | 'admin-manage-themes'
   | 'admin-manage-journeys'
   | 'admin-manage-apps'
@@ -136,8 +134,8 @@ function App() {
   };
 
   const navigateToAdminThemes = () => {
-    pushToHistory('admin-themes', null, null);
-    setCurrentView('admin-themes');
+    pushToHistory('admin-manage-themes', null, null);
+    setCurrentView('admin-manage-themes');
     setSelectedApp(null);
     setSelectedJourney(null);
   };
@@ -176,10 +174,8 @@ function App() {
     setSelectedApp(null);
     setSelectedJourney(null);
   };
-  const handleAdminTabChange = (tab: 'submit' | 'manage-themes' | 'manage-journeys' | 'manage-apps' | 'settings') => {
-    if (tab === 'submit') {
-      navigateToAdminThemes();
-    } else if (tab === 'manage-themes') {
+  const handleAdminTabChange = (tab: 'manage-themes' | 'manage-journeys' | 'manage-apps' | 'settings') => {
+    if (tab === 'manage-themes') {
       navigateToManageThemes();
     } else if (tab === 'manage-journeys') {
       navigateToManageJourneys();
@@ -342,16 +338,6 @@ function App() {
           onNavigateTopPains={navigateToTopPains}
           onNavigateAdmin={navigateToAdminThemes}
           onNavigateExport={navigateToExport}
-        />
-      )}
-      {currentView === 'admin-themes' && (
-        <AdminThemesView
-          onNavigateBack={navigateBack}
-          onNavigateHome={navigateToPortfolio}
-          onNavigateAllApps={navigateToAllApps}
-          onNavigateKeyJourneys={navigateToAllJourneys}
-          onNavigateTopPains={navigateToTopPains}
-          onTabChange={handleAdminTabChange}
         />
       )}
       {currentView === 'admin-manage-themes' && (

@@ -98,6 +98,16 @@ const normalizeMetricsSystem = (value: string | null): 'pendo' | 'medallia' =>
 const getTrendFromChange = (value: number): 'up' | 'down' | 'stable' =>
   value > 0 ? 'up' : value < 0 ? 'down' : 'stable';
 
+const getQuarterCodeFromMonth = (periodCode?: string | null) => {
+  const match = periodCode?.match(/^FY(\d{2})-(\d{2})$/i);
+  if (!match) return null;
+  const fiscalYear = match[1];
+  const month = Number(match[2]);
+  if (Number.isNaN(month) || month < 1 || month > 12) return null;
+  const quarter = Math.ceil(month / 3);
+  return `FY${fiscalYear}-Q${quarter}`;
+};
+
 const getCompletedQuarterCodeFromMonth = (periodCode?: string | null) => {
   const match = periodCode?.match(/^FY(\d{2})-(\d{2})$/i);
   if (!match) return null;
@@ -552,7 +562,7 @@ function AppDetailPage({
 
   // Chart dimensions - adjusted for tighter fit
   const chartWidth = 320;
-  const chartHeight = 165;
+  const chartHeight = 150;
   const chartPadding = { top: 15, right: 25, bottom: 35, left: 50 };
 
   // Overall Score Chart (with Target line at 80)
@@ -873,13 +883,12 @@ function AppDetailPage({
       {/* Main Content */}
       <div className="flex-1 flex">
         {/* Middle - Charts (45% of remaining width) */}
-        <div className="w-[45%] px-6 py-4 flex flex-col justify-between">
-          <div
-            className="text-xs text-slate-500 mb-2 h-4"
-            style={{ visibility: showQuarterLoading ? 'visible' : 'hidden' }}
-          >
-            Loading quarterly trends…
-          </div>
+        <div className="relative w-[45%] px-6 pt-[18px] pb-3 flex flex-col gap-3 justify-start">
+          {showQuarterLoading && (
+            <div className="absolute left-6 top-2 text-xs text-slate-500">
+              Loading quarterly trends…
+            </div>
+          )}
           {/* Overall Score Chart */}
           <div>
             {renderOverallScoreChart()}
@@ -1211,7 +1220,8 @@ export function ExportReport({
         setIsQuarterLoading(false);
         return;
       }
-      const targetQuarterCode = getCompletedQuarterCodeFromMonth(selectedMonthCode);
+      const targetQuarterCode =
+        getQuarterCodeFromMonth(selectedMonthCode) ?? getCompletedQuarterCodeFromMonth(selectedMonthCode);
       if (!targetQuarterCode) {
         setQuarterLabels([]);
         setAppQuarterSeries({});

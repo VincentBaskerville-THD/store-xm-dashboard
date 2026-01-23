@@ -332,7 +332,12 @@ export function AppDetailEnhanced({
         {/* Current Score Summary */}
         <section className="mb-8">
           <div className="bg-slate-900 text-white p-6 sm:p-8 rounded-lg">
-            <h2 className="text-slate-300 mb-2">Overall Score — {headerSubtitle}</h2>
+            <div className="flex items-start justify-between gap-2 mb-2">
+              <h2 className="text-slate-300">Overall Score — {headerSubtitle}</h2>
+              <span className="rounded-full bg-slate-800/80 px-3 py-1 text-xs font-semibold text-orange-100">
+                {appName ?? appId}
+              </span>
+            </div>
             <div className="flex items-baseline gap-2">
               <span className="text-5xl sm:text-[72px] font-semibold text-orange-500">{currentPeriodData?.overall_score ?? 0}</span>
               <span className="text-slate-400">/100</span>
@@ -351,7 +356,9 @@ export function AppDetailEnhanced({
                 <div className="text-white mt-2">{currentPeriodData?.usefulness_avg ?? 0}/5</div>
               </div>
               <div>
-                <div className="text-white mt-4">{currentPeriodData?.response_count ?? 0} Responses</div>
+                <div className="text-white mt-4">
+                  {(currentPeriodData?.response_count ?? 0).toLocaleString()} Responses
+                </div>
                 <div className="text-slate-400 mt-2 text-sm">*Based on UX-Lite Metric Calculation</div>
               </div>
             </div>
@@ -361,7 +368,10 @@ export function AppDetailEnhanced({
         {/* Score Trend Chart */}
         <section className="mb-8">
           <Card className="p-6 border-slate-200">
-            <h2 className="text-slate-900 mb-4">UX Lite Score & Top + Bottom Box</h2>
+            <h2 className="text-slate-900 mb-4 text-center">
+              <div>UX Lite Score</div>
+              <div className="text-sm font-normal text-slate-600">(Score, Top & Bottom Box)</div>
+            </h2>
             <ResponsiveContainer width="100%" height={350}>
               <ComposedChart data={chartData}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
@@ -405,7 +415,10 @@ export function AppDetailEnhanced({
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Ease of Use */}
             <Card className="p-6 border-slate-200">
-              <h2 className="text-slate-900 mb-4">Easy to Use - Score & Top + Bottom Box</h2>
+              <h2 className="text-slate-900 mb-4 text-center">
+                <div>Easy to Use</div>
+                <div className="text-sm font-normal text-slate-600">(Score, Top & Bottom Box)</div>
+              </h2>
               <ResponsiveContainer width="100%" height={300}>
                 <ComposedChart data={chartData}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
@@ -445,7 +458,10 @@ export function AppDetailEnhanced({
 
             {/* Usefulness */}
             <Card className="p-6 border-slate-200">
-              <h2 className="text-slate-900 mb-4">Usefulness - Score & Top + Bottom Box</h2>
+              <h2 className="text-slate-900 mb-4 text-center">
+                <div>Usefulness</div>
+                <div className="text-sm font-normal text-slate-600">(Score, Top & Bottom Box)</div>
+              </h2>
               <ResponsiveContainer width="100%" height={300}>
                 <ComposedChart data={chartData}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />

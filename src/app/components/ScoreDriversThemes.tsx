@@ -1,7 +1,6 @@
-import { useState } from 'react';
-import { ChevronDown, ChevronUp, AlertCircle } from 'lucide-react';
+import React from 'react';
+import { AlertCircle } from 'lucide-react';
 import { Card } from './ui/card';
-import { Button } from './ui/button';
 
 export type ThemeCategory = {
   title: string;
@@ -37,37 +36,37 @@ interface ScoreDriversThemesProps {
   subtitle?: string;
 }
 
-// Helper: Derive persistence classification from monthsActive
-const getPersistenceLabel = (monthsActive?: number): { label: string; color: string; bgColor: string; borderColor: string } => {
-  if (!monthsActive) return { label: 'New', color: 'text-slate-700', bgColor: 'bg-slate-50', borderColor: 'border-slate-300' };
-  if (monthsActive >= 6) return { label: 'Chronic', color: 'text-red-900', bgColor: 'bg-red-50', borderColor: 'border-red-300' };
-  if (monthsActive >= 3) return { label: 'Recurring', color: 'text-orange-900', bgColor: 'bg-orange-50', borderColor: 'border-orange-300' };
-  return { label: 'Emerging', color: 'text-amber-900', bgColor: 'bg-amber-50', borderColor: 'border-amber-300' };
+// Helper: Derive persistence classification from monthsActive (matches ManageThemes)
+const getPersistenceLabel = (monthsActive?: number): { label: string } => {
+  if (!monthsActive || monthsActive === 0) return { label: 'New this period' };
+  if (monthsActive < 3) return { label: `Emerging pattern (${monthsActive} month${monthsActive > 1 ? 's' : ''})` };
+  if (monthsActive < 6) return { label: `Recurring pattern (${monthsActive} months)` };
+  return { label: `Chronic issue (${monthsActive}+ months)` };
 };
 
-// Helper: Get status badge styling
+// Helper: Get status badge styling (matches ManageThemes)
 const getStatusBadge = (status?: 'unresolved' | 'improving' | 'stabilized' | 'resolved-monitoring', type?: 'positive' | 'negative' | 'neutral') => {
   // For positive themes, default to "Stabilized"
   if (type === 'positive' && !status) {
-    return { label: 'Stabilized', color: 'text-green-800', bgColor: 'bg-green-100', borderColor: 'border-green-300' };
+    return { label: 'Stabilized', color: 'text-green-800', bgColor: 'bg-green-100' };
   }
   
-  // For negative themes, infer from trend or default to "Unresolved"
+  // For negative themes, default to "Unresolved"
   if (!status) {
-    return { label: 'Unresolved', color: 'text-red-800', bgColor: 'bg-red-100', borderColor: 'border-red-300' };
+    return { label: 'Unresolved', color: 'text-red-800', bgColor: 'bg-red-100' };
   }
   
   switch (status) {
     case 'unresolved':
-      return { label: 'Unresolved', color: 'text-red-800', bgColor: 'bg-red-100', borderColor: 'border-red-300' };
+      return { label: 'Unresolved', color: 'text-red-800', bgColor: 'bg-red-100' };
     case 'improving':
-      return { label: 'Improving', color: 'text-blue-800', bgColor: 'bg-blue-100', borderColor: 'border-blue-300' };
+      return { label: 'Improving', color: 'text-amber-800', bgColor: 'bg-amber-100' };
     case 'stabilized':
-      return { label: 'Stabilized', color: 'text-green-800', bgColor: 'bg-green-100', borderColor: 'border-green-300' };
+      return { label: 'Stabilized', color: 'text-green-800', bgColor: 'bg-green-100' };
     case 'resolved-monitoring':
-      return { label: 'Resolved — Monitoring', color: 'text-emerald-800', bgColor: 'bg-emerald-100', borderColor: 'border-emerald-300' };
+      return { label: 'Resolved - Monitoring', color: 'text-blue-800', bgColor: 'bg-blue-100' };
     default:
-      return { label: 'Under Review', color: 'text-slate-800', bgColor: 'bg-slate-100', borderColor: 'border-slate-300' };
+      return { label: 'Under Review', color: 'text-slate-800', bgColor: 'bg-slate-100' };
   }
 };
 
@@ -96,17 +95,6 @@ export function ScoreDriversThemes({
   title = 'Feedback Themes',
   subtitle = 'AI Supported Summary'
 }: ScoreDriversThemesProps) {
-  const [expandedThemes, setExpandedThemes] = useState<Set<number>>(new Set());
-
-  const toggleTheme = (index: number) => {
-    const newExpanded = new Set(expandedThemes);
-    if (newExpanded.has(index)) {
-      newExpanded.delete(index);
-    } else {
-      newExpanded.add(index);
-    }
-    setExpandedThemes(newExpanded);
-  };
 
   const getThemeColor = (type: 'positive' | 'negative' | 'neutral') => {
     if (type === 'positive') return { bg: 'bg-green-50', border: 'border-green-200', text: 'text-green-900', icon: '—' };
@@ -114,7 +102,7 @@ export function ScoreDriversThemes({
     return { bg: 'bg-blue-50', border: 'border-blue-200', text: 'text-blue-900', icon: '—' };
   };
 
-  const getMetadataBadges = (metadata?: ThemeMetadata) => {
+  const getMetadataBadges = (metadata?: ThemeMetadata, themeType?: ThemeCategory['type']) => {
     if (!metadata) return null;
     
     return (
@@ -145,8 +133,8 @@ export function ScoreDriversThemes({
           </span>
         )}
         {metadata.status && (
-          <span className="inline-flex items-center px-2 py-0.5 rounded bg-slate-100 border border-slate-300 text-slate-800 text-xs font-semibold">
-            {getStatusBadge(metadata.status, metadata.type).label}
+          <span className={`inline-flex items-center px-2 py-0.5 rounded ${getStatusBadge(metadata.status, themeType).bgColor} ${getStatusBadge(metadata.status, themeType).color} text-xs font-semibold`}>
+            {getStatusBadge(metadata.status, themeType).label}
           </span>
         )}
       </div>
@@ -181,32 +169,32 @@ export function ScoreDriversThemes({
 
     return (
       <div>
-        <div className="mb-4">
-          <h3 className="text-slate-900">{title.replace('FEEDBACK THEMES', 'TOP FEEDBACK THEMES')}</h3>
-          <p className="text-slate-600">{subtitle}</p>
+        <div className="mb-5">
+          <h3 className="text-slate-900 text-sm font-semibold tracking-wide uppercase mb-1">{title.replace('FEEDBACK THEMES', 'TOP FEEDBACK THEMES')}</h3>
+          <p className="text-slate-600 text-sm">{subtitle}</p>
         </div>
         
         {/* Narrative Summary */}
-        <div className="mb-6 p-4 bg-slate-50 border-l-4 border-orange-600 rounded">
+        <div className="mb-6 p-4 bg-orange-50 border-l-4 border-orange-500 rounded-md shadow-sm">
           <div className="flex items-start gap-3">
             <AlertCircle className="size-5 text-orange-600 flex-shrink-0 mt-0.5" />
-            <p className="text-slate-900 leading-relaxed">{narrativeSummary}</p>
+            <p className="text-slate-900 leading-relaxed text-[14px]">{narrativeSummary}</p>
           </div>
         </div>
         
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
           {/* Right Column - Insight Cards (appears first on mobile) */}
           <div className="lg:col-span-4 lg:order-2 space-y-3">
-            <div className="text-slate-700 font-semibold mb-3">Priority Indicators</div>
+            <div className="text-slate-700 font-semibold mb-3 text-sm">Priority Indicators</div>
             
             {/* Chronic issues count */}
             {chronicCount > 0 && (
-              <Card className="p-4 border-0 bg-white">
-                <div className="flex items-center gap-2">
-                  <div className="text-[28px] font-semibold text-slate-900 leading-none">
+              <Card className="p-4 border border-slate-200 bg-white shadow-sm">
+                <div className="flex items-center gap-3">
+                  <div className="text-[32px] font-semibold text-slate-900 leading-none">
                     {chronicCount}
                   </div>
-                  <div className="text-slate-700 leading-tight">
+                  <div className="text-slate-700 text-sm leading-tight">
                     chronic issue{chronicCount !== 1 ? 's' : ''} requiring immediate attention
                   </div>
                 </div>
@@ -215,12 +203,12 @@ export function ScoreDriversThemes({
 
             {/* Unresolved issues */}
             {unresolvedCount > 0 && (
-              <Card className="p-4 border-0 bg-white">
-                <div className="flex items-center gap-2">
-                  <div className="text-[28px] font-semibold text-slate-900 leading-none">
+              <Card className="p-4 border border-slate-200 bg-white shadow-sm">
+                <div className="flex items-center gap-3">
+                  <div className="text-[32px] font-semibold text-slate-900 leading-none">
                     {unresolvedCount}
                   </div>
-                  <div className="text-slate-700 leading-tight">
+                  <div className="text-slate-700 text-sm leading-tight">
                     unresolved pain point{unresolvedCount !== 1 ? 's' : ''} this period
                   </div>
                 </div>
@@ -229,12 +217,12 @@ export function ScoreDriversThemes({
 
             {/* Cross-app unresolved issues */}
             {unresolvedCrossAppCount > 0 && (
-              <Card className="p-4 border-0 bg-white">
-                <div className="flex items-center gap-2">
-                  <div className="text-[28px] font-semibold text-slate-900 leading-none">
+              <Card className="p-4 border border-slate-200 bg-white shadow-sm">
+                <div className="flex items-center gap-3">
+                  <div className="text-[32px] font-semibold text-slate-900 leading-none">
                     {unresolvedCrossAppCount}
                   </div>
-                  <div className="text-slate-700 leading-tight">
+                  <div className="text-slate-700 text-sm leading-tight">
                     unresolved cross-app issue{unresolvedCrossAppCount !== 1 ? 's' : ''}
                   </div>
                 </div>
@@ -243,12 +231,12 @@ export function ScoreDriversThemes({
 
             {/* Persistent feedback percentage */}
             {persistentFeedbackPercent > 0 && (
-              <Card className="p-4 border-0 bg-white">
-                <div className="flex items-center gap-2">
-                  <div className="text-[28px] font-semibold text-slate-900 leading-none">
+              <Card className="p-4 border border-slate-200 bg-white shadow-sm">
+                <div className="flex items-center gap-3">
+                  <div className="text-[32px] font-semibold text-slate-900 leading-none">
                     {persistentFeedbackPercent}%
                   </div>
-                  <div className="text-slate-700 leading-tight">
+                  <div className="text-slate-700 text-sm leading-tight">
                     of feedback tied to recurring or chronic issues
                   </div>
                 </div>
@@ -257,12 +245,12 @@ export function ScoreDriversThemes({
 
             {/* New pattern alerts */}
             {themes.some(t => t.metadata?.isNew) && (
-              <Card className="p-4 border-0 bg-white">
-                <div className="flex items-center gap-2">
-                  <div className="text-[28px] font-semibold text-slate-900 leading-none">
+              <Card className="p-4 border border-slate-200 bg-white shadow-sm">
+                <div className="flex items-center gap-3">
+                  <div className="text-[32px] font-semibold text-slate-900 leading-none">
                     {themes.filter(t => t.metadata?.isNew).length}
                   </div>
-                  <div className="text-slate-700 leading-tight">
+                  <div className="text-slate-700 text-sm leading-tight">
                     emerging pattern{themes.filter(t => t.metadata?.isNew).length !== 1 ? 's' : ''} detected
                   </div>
                 </div>
@@ -271,12 +259,12 @@ export function ScoreDriversThemes({
 
             {/* Improving trends */}
             {themes.some(t => t.metadata?.status === 'improving') && (
-              <Card className="p-4 border-0 bg-white">
-                <div className="flex items-center gap-2">
-                  <div className="text-[28px] font-semibold text-slate-900 leading-none">
+              <Card className="p-4 border border-slate-200 bg-white shadow-sm">
+                <div className="flex items-center gap-3">
+                  <div className="text-[32px] font-semibold text-slate-900 leading-none">
                     {themes.filter(t => t.metadata?.status === 'improving').length}
                   </div>
-                  <div className="text-slate-700 leading-tight">
+                  <div className="text-slate-700 text-sm leading-tight">
                     issue{themes.filter(t => t.metadata?.status === 'improving').length !== 1 ? 's' : ''} showing improvement
                   </div>
                 </div>
@@ -285,116 +273,95 @@ export function ScoreDriversThemes({
           </div>
 
           {/* Left Column - Theme Cards (appears second on mobile) */}
-          <div className="lg:col-span-8 lg:order-1 space-y-3">
+          <div className="lg:col-span-8 lg:order-1 grid grid-cols-1 md:grid-cols-2 gap-4">
             {themes.map((theme, index) => {
-              const colors = getThemeColor(theme.type);
-              const isExpanded = expandedThemes.has(index);
               const persistence = getPersistenceLabel(theme.metadata?.monthsActive);
               const status = getStatusBadge(theme.metadata?.status, theme.type);
               
               return (
-                <Card key={index} className="p-4 border-0 bg-slate-50 hover:bg-slate-100 transition-colors">
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <div className="flex items-start sm:items-center flex-col sm:flex-row gap-2 mb-2">
-                        <div className="flex items-center gap-2 flex-1">
-                          <span className={`text-xl ${colors.text}`}>{colors.icon}</span>
-                          <h4 className="font-semibold text-slate-900">
-                            {theme.title}
-                          </h4>
-                        </div>
-                        <span className={`px-2 py-0.5 rounded text-sm font-semibold ${colors.text} whitespace-nowrap`}>
-                          {theme.percentage}%
-                        </span>
-                      </div>
+                <Card key={index} className="bg-white rounded-lg border border-slate-200 p-4 space-y-2.5">
+                  {/* Title and Badges */}
+                  <div className="space-y-2">
+                    <div className="font-semibold text-base text-slate-900">
+                      {theme.title}
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {/* Type badge */}
+                      <span className={`text-xs px-2 py-1 rounded font-medium ${
+                        theme.type === 'positive' ? 'bg-green-100 text-green-800' :
+                        theme.type === 'negative' ? 'bg-red-100 text-red-800' :
+                        'bg-slate-100 text-slate-800'
+                      }`}>
+                        {theme.type === 'positive' ? 'Positive' : theme.type === 'negative' ? 'Pain Point' : 'Neutral'}
+                      </span>
                       
-                      {/* Persistence and Status Badges */}
-                      <div className="flex flex-wrap items-center gap-2 mb-2">
-                        <span className={`inline-flex items-center px-2.5 py-1 rounded font-semibold text-xs ${persistence.color} ${persistence.bgColor}`}>
+                      {/* Status badge */}
+                      <span className={`text-xs px-2 py-1 rounded font-medium ${status.bgColor} ${status.color}`}>
+                        {status.label}
+                      </span>
+                      
+                      {/* Persistence badge */}
+                      {theme.metadata?.monthsActive !== undefined && theme.metadata?.monthsActive > 0 && (
+                        <span className="text-xs px-2 py-1 rounded bg-slate-100 text-slate-700 font-medium">
                           {persistence.label}
                         </span>
-                        <span className={`inline-flex items-center px-2.5 py-1 rounded font-semibold text-xs ${status.color} ${status.bgColor}`}>
-                          {status.label}
+                      )}
+                      
+                      {/* Trend badge */}
+                      {theme.metadata?.trendDirection && theme.metadata?.trendDirection !== 'stable' && (
+                        <span className={`text-xs px-2 py-1 rounded font-medium ${
+                          theme.metadata.trendDirection === 'increasing' ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'
+                        }`}>
+                          {theme.metadata.trendDirection === 'increasing' ? '↑' : '↓'} {Math.abs(theme.metadata.trendPercentage || 0)}%
                         </span>
-                      </div>
+                      )}
+                      
+                      {/* New badge */}
+                      {theme.metadata?.isNew && (
+                        <span className="text-xs px-2 py-1 rounded bg-blue-100 text-blue-700 font-medium">
+                          New this period
+                        </span>
+                      )}
+                    </div>
+                  </div>
 
-                      {/* Existing metadata badges */}
-                      <div className="flex flex-wrap items-center gap-2">
-                        {theme.metadata?.monthsActive && (
-                          <span className="inline-flex items-center px-2 py-0.5 rounded bg-slate-100 text-slate-700 text-xs">
-                            Active {theme.metadata.monthsActive} months
-                          </span>
-                        )}
-                        {theme.metadata?.crossAppCount && theme.metadata.crossAppCount > 1 && (
-                          <span className="inline-flex items-center px-2 py-0.5 rounded bg-purple-100 text-purple-800 text-xs">
-                            {theme.metadata.crossAppCount} apps affected
-                          </span>
-                        )}
-                        {theme.metadata?.trendDirection === 'increasing' && theme.metadata?.trendPercentage && (
-                          <span className="inline-flex items-center px-2 py-0.5 rounded bg-red-100 text-red-800 text-xs">
-                            ↑ {theme.metadata.trendPercentage}% vs last period
-                          </span>
-                        )}
-                        {theme.metadata?.trendDirection === 'decreasing' && theme.metadata?.trendPercentage && (
-                          <span className="inline-flex items-center px-2 py-0.5 rounded bg-green-100 text-green-800 text-xs">
-                            ↓ {theme.metadata.trendPercentage}% vs last period
-                          </span>
-                        )}
-                        {theme.metadata?.isNew && (
-                          <span className="inline-flex items-center px-2 py-0.5 rounded bg-blue-100 text-blue-800 text-xs">
-                            New this period
-                          </span>
-                        )}
-                      </div>
+                  {/* Context Metadata */}
+                  <div className="pt-2 border-t border-slate-100 space-y-1 text-xs text-slate-600">
+                    <div><strong>Percentage:</strong> {theme.percentage}% of feedback</div>
+                    {theme.metadata?.monthsActive && (
+                      <div><strong>Active:</strong> {theme.metadata.monthsActive} month{theme.metadata.monthsActive !== 1 ? 's' : ''}</div>
+                    )}
+                    {theme.metadata?.crossAppCount && theme.metadata.crossAppCount > 1 && (
+                      <div><strong>Cross-App:</strong> {theme.metadata.crossAppCount} apps affected</div>
+                    )}
+                  </div>
 
-                      <ul className="mt-3 space-y-1 text-slate-700 list-none">
+                  {/* Summary Points */}
+                  {theme.narratives && theme.narratives.length > 0 && (
+                    <div className="pt-2 border-t border-slate-100">
+                      <div className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">Summary Points</div>
+                      <ul className="space-y-1 text-sm text-slate-700">
                         {theme.narratives.map((narrative, nIndex) => (
-                          <li key={nIndex} className="flex items-start gap-2">
-                            <span className="mt-1 text-slate-400">—</span>
+                          <li key={nIndex} className="flex gap-2">
+                            <span className="text-slate-400 shrink-0">•</span>
                             <span>{narrative}</span>
                           </li>
                         ))}
                       </ul>
                     </div>
-                  </div>
-                  
+                  )}
+
+                  {/* Example Comments */}
                   {theme.exampleComments && theme.exampleComments.length > 0 && (
-                    <div className="mt-3">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => toggleTheme(index)}
-                        className="text-slate-600 hover:text-slate-900 hover:bg-slate-100"
-                      >
-                        {isExpanded ? (
-                          <>
-                            <ChevronUp className="size-4 mr-1" />
-                            Hide {theme.exampleComments.length} example comments
-                          </>
-                        ) : (
-                          <>
-                            <ChevronDown className="size-4 mr-1" />
-                            See {theme.exampleComments.length} example comments
-                          </>
-                        )}
-                      </Button>
-                      
-                      {isExpanded && (
-                        <div className="mt-3 space-y-2 pl-4 border-l-2 border-slate-300">
-                          {theme.exampleComments.map((comment, cIndex) => (
-                            <div key={cIndex} className="bg-white p-3 rounded">
-                              <p className="text-slate-900 italic">"{comment.text}"</p>
-                              <div className="flex items-center gap-3 mt-2 text-slate-600 text-sm flex-wrap">
-                                <span>{comment.date}</span>
-                                {comment.userRole && <span>• {comment.userRole}</span>}
-                                {comment.rating && (
-                                  <span>• {'⭐'.repeat(comment.rating)}</span>
-                                )}
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      )}
+                    <div className="pt-2 border-t border-slate-100">
+                      <div className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">Example Comments</div>
+                      <div className="space-y-1.5">
+                        {theme.exampleComments.map((comment, cIndex) => (
+                          <div key={cIndex} className="bg-slate-50 rounded p-2 text-xs text-slate-600 italic border-l-2 border-slate-300">
+                            "{comment.text}"
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   )}
                 </Card>
@@ -424,7 +391,7 @@ export function ScoreDriversThemes({
                   <h4 className={`font-semibold ${colors.text} mb-2`}>
                     {colors.icon} {theme.title} ({theme.percentage}%)
                   </h4>
-                  {getMetadataBadges(theme.metadata)}
+                  {getMetadataBadges(theme.metadata, theme.type)}
                   <ul className={`mt-3 space-y-1 ${colors.text} list-none`}>
                     {theme.narratives.map((narrative, nIndex) => (
                       <li key={nIndex} className="flex items-start gap-2">
