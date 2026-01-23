@@ -16,6 +16,7 @@ interface ExportReportProps {
   onNavigateKeyJourneys?: () => void;
   onNavigateTopPains?: () => void;
   onNavigateAdmin?: () => void;
+  showAdminButton?: boolean;
 }
 
 type ReportSection = 'scores' | 'journeys' | 'pains';
@@ -1013,6 +1014,7 @@ export function ExportReport({
   onNavigateKeyJourneys,
   onNavigateTopPains,
   onNavigateAdmin,
+  showAdminButton,
 }: ExportReportProps) {
   const previewPanelRef = useRef<HTMLDivElement>(null);
   const [previewScale, setPreviewScale] = useState(1);
@@ -1717,6 +1719,7 @@ export function ExportReport({
           onNavigateKeyJourneys={onNavigateKeyJourneys || onNavigateBack}
           onNavigateTopPains={onNavigateTopPains || onNavigateBack}
           onNavigateAdmin={onNavigateAdmin}
+          showAdminButton={showAdminButton}
           title="Export Report"
           subtitle="Configure and download custom reports"
           showExportButton={false}

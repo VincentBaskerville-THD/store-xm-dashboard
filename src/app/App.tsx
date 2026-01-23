@@ -481,6 +481,7 @@ function App() {
           onNavigateToView={navigateToView}
           onNavigateAdmin={requestAdminAccess}
           onNavigateExport={navigateToExport}
+          showAdminButton={adminShowButton}
         />
       )}
       {currentView === 'app-detail' && selectedApp && (
@@ -503,6 +504,7 @@ function App() {
           onNavigateTopPains={navigateToTopPains}
           onNavigateAdmin={requestAdminAccess}
           onNavigateExport={navigateToExport}
+          showAdminButton={adminShowButton}
         />
       )}
       {currentView === 'journey-detail' && selectedJourney && (
@@ -526,6 +528,7 @@ function App() {
           onNavigateTopPains={navigateToTopPains}
           onNavigateAdmin={requestAdminAccess}
           onNavigateExport={navigateToExport}
+          showAdminButton={adminShowButton}
         />
       )}
       {currentView === 'all-apps' && (
@@ -538,6 +541,7 @@ function App() {
           onNavigateTopPains={navigateToTopPains}
           onNavigateAdmin={requestAdminAccess}
           onNavigateExport={navigateToExport}
+          showAdminButton={adminShowButton}
         />
       )}
       {currentView === 'all-journeys' && (
@@ -553,6 +557,7 @@ function App() {
           onNavigateAdmin={requestAdminAccess}
           onNavigateExport={navigateToExport}
           isFeatureEnabled={featureFlags.keyJourneysEnabled}
+          showAdminButton={adminShowButton}
         />
       )}
       {currentView === 'time-series' && (
@@ -592,6 +597,7 @@ function App() {
           onNavigateAdmin={navigateToAdminThemes}
           onNavigateExport={navigateToExport}
           isFeatureEnabled={featureFlags.topPainsEnabled}
+          showAdminButton={adminShowButton}
         />
       )}
       {currentView === 'admin-manage-themes' && (
@@ -664,6 +670,7 @@ function App() {
           onNavigateKeyJourneys={navigateToAllJourneys}
           onNavigateTopPains={navigateToTopPains}
           onNavigateAdmin={requestAdminAccess}
+          showAdminButton={adminShowButton}
         />
       )}
       </div>

@@ -20,6 +20,7 @@ interface TopPainsProps {
   onNavigateAdmin?: () => void;
   onNavigateExport?: () => void;
   isFeatureEnabled?: boolean;
+  showAdminButton?: boolean;
 }
 
 interface PainPoint {
@@ -602,6 +603,7 @@ export function TopPains({
   onNavigateAdmin,
   onNavigateExport,
   isFeatureEnabled = true,
+  showAdminButton,
 }: TopPainsProps) {
   if (!isFeatureEnabled) {
     return (
@@ -614,6 +616,8 @@ export function TopPains({
           onNavigateTopPains={onNavigateTopPains || (() => {})}
           onNavigateAdmin={onNavigateAdmin}
           onNavigateExport={onNavigateExport}
+          showAdminButton={showAdminButton}
+        showAdminButton={showAdminButton}
           title="Top Pains"
           subtitle="Emerging experience issues across the portfolio"
           showExportButton={true}

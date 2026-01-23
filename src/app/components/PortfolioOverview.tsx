@@ -18,6 +18,7 @@ interface PortfolioOverviewProps {
   onNavigateToView: (view: ViewType) => void;
   onNavigateAdmin?: () => void;
   onNavigateExport?: () => void;
+  showAdminButton?: boolean;
 }
 
 type SortField = 'name' | 'overallScore' | 'scoreMoM' | 'easeOfUse' | 'usefulness' | 'responses';
@@ -58,6 +59,7 @@ export function PortfolioOverview({
   onNavigateToView,
   onNavigateAdmin,
   onNavigateExport,
+  showAdminButton,
 }: PortfolioOverviewProps) {
   // UI state + data state for the portfolio view (sorts, filters, and fetched metrics).
   const [sortField, setSortField] = useState<SortField>('name');
@@ -393,6 +395,7 @@ export function PortfolioOverview({
         onNavigateTopPains={() => onNavigateToView('top-pains')}
         onNavigateAdmin={onNavigateAdmin}
         onNavigateExport={onNavigateExport}
+        showAdminButton={showAdminButton}
         title="Store Ops Portfolio Experience Metrics"
         subtitle="Performance dashboard for all applications and journeys"
         lastUpdated={formatLastUpdated(lastUpdatedAt)}

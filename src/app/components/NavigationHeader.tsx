@@ -38,7 +38,7 @@ export function NavigationHeader({
     { id: 'top-pains', label: 'Top Pains', onClick: onNavigateTopPains },
   ];
 
-  const isAdminButtonVisible = showAdminButton && (localStorage.getItem('adminShowButton') ?? 'true') !== 'false';
+  const isAdminButtonVisible = showAdminButton;
 
   return (
     <header className="border-b border-slate-200 bg-slate-900 text-white">

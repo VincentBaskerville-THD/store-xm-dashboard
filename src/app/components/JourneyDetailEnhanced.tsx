@@ -24,6 +24,7 @@ interface JourneyDetailEnhancedProps {
   onNavigateTopPains?: () => void;
   onNavigateAdmin?: () => void;
   onNavigateExport?: () => void;
+  showAdminButton?: boolean;
 }
 
 type TrendView = 'overall' | 'by-app' | 'by-step';
@@ -39,7 +40,8 @@ export function JourneyDetailEnhanced({
   onNavigateKeyJourneys,
   onNavigateTopPains,
   onNavigateAdmin,
-  onNavigateExport
+  onNavigateExport,
+  showAdminButton,
 }: JourneyDetailEnhancedProps) {
   const [trendView, setTrendView] = useState<TrendView>('overall');
   const [showDetailedTable, setShowDetailedTable] = useState(false);
@@ -344,6 +346,7 @@ export function JourneyDetailEnhanced({
         onNavigateTopPains={onNavigateTopPains || onNavigateBack}
         onNavigateAdmin={onNavigateAdmin}
         onNavigateExport={onNavigateExport}
+        showAdminButton={showAdminButton}
         title={journey.name}
         subtitle="End-to-end journey performance"
         showExportButton={true}

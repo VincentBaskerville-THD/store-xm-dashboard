@@ -18,6 +18,7 @@ interface AllJourneysViewProps {
   onNavigateAdmin?: () => void;
   onNavigateExport?: () => void;
   isFeatureEnabled?: boolean;
+  showAdminButton?: boolean;
 }
 
 export function AllJourneysView({
@@ -32,6 +33,7 @@ export function AllJourneysView({
   onNavigateAdmin,
   onNavigateExport,
   isFeatureEnabled = true,
+  showAdminButton,
 }: AllJourneysViewProps) {
   if (!isFeatureEnabled) {
     return (
@@ -44,6 +46,7 @@ export function AllJourneysView({
           onNavigateTopPains={onNavigateTopPains || onNavigateBack}
           onNavigateAdmin={onNavigateAdmin}
           onNavigateExport={onNavigateExport}
+          showAdminButton={showAdminButton}
           title="All Journeys"
           subtitle="End-to-end journey performance"
           showExportButton={true}
@@ -72,6 +75,7 @@ export function AllJourneysView({
         onNavigateTopPains={onNavigateTopPains || onNavigateBack}
         onNavigateAdmin={onNavigateAdmin}
         onNavigateExport={onNavigateExport}
+        showAdminButton={showAdminButton}
         title="All Journeys"
         subtitle="End-to-end journey performance"
         showExportButton={true}

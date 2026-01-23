@@ -20,6 +20,7 @@ interface AppDetailEnhancedProps {
   onNavigateTopPains?: () => void;
   onNavigateAdmin?: () => void;
   onNavigateExport?: () => void;
+  showAdminButton?: boolean;
 }
 
 type AppMetricsRow = {
@@ -72,6 +73,7 @@ export function AppDetailEnhanced({
   onNavigateTopPains,
   onNavigateAdmin,
   onNavigateExport,
+  showAdminButton,
 }: AppDetailEnhancedProps) {
   // Live series for one app across time; drives header, summary, and charts.
   const [appSeries, setAppSeries] = useState<AppMetricsRow[]>([]);
@@ -433,6 +435,7 @@ export function AppDetailEnhanced({
         onNavigateTopPains={onNavigateTopPains || onNavigateBack}
         onNavigateAdmin={onNavigateAdmin}
         onNavigateExport={onNavigateExport}
+        showAdminButton={showAdminButton}
         title={appName ?? appId}
         subtitle={headerSubtitle}
         showExportButton={true}
