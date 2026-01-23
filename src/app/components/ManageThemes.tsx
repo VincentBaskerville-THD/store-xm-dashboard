@@ -33,7 +33,7 @@ interface ThemeOccurrence {
   periodSortOrder?: number;
   periodCode?: string;
   persistenceTag?: string;
-  percentage: number;
+  percentage: number | null;
   type: 'positive' | 'negative' | 'neutral';
   status?: 'unresolved' | 'improving' | 'stabilized' | 'resolved-monitoring';
   descriptionBullets: string[];
@@ -68,7 +68,7 @@ interface ExistingTheme {
   title: string;
   appId: string;
   appName: string;
-  percentage: number;
+  percentage: number | null;
   type: 'positive' | 'negative' | 'neutral';
   monthsActive: number;
   trendDirection: 'increasing' | 'decreasing' | 'stable';
@@ -81,7 +81,7 @@ const emptyOccurrence: Partial<ThemeOccurrence> = {
   themeName: '',
   appId: undefined,
   appName: undefined,
-  percentage: 0,
+  percentage: null,
   type: 'negative',
   status: 'unresolved',
   descriptionBullets: [''],
@@ -140,7 +140,7 @@ const mapObservationRow = (row: any): ThemeOccurrence => {
     timePeriod: periodLabel,
     periodSortOrder: typeof row.sort_order === 'number' ? row.sort_order : row.fiscal_periods?.sort_order ?? row.period_sort_order,
     periodCode: row.period ?? row.period_code ?? row.periodCode,
-    percentage: row.percent_of_feedback ?? row.percentage ?? 0,
+    percentage: row.percent_of_feedback ?? row.percentage ?? null,
     type: row.theme_type ?? row.type ?? row.default_type ?? 'negative',
     status: normalizeStatus(row.status),
     descriptionBullets: bullets.length > 0 ? bullets : (row.narrative ? [row.narrative] : []),
@@ -872,13 +872,18 @@ export function ManageThemes({
 
       const bullets = editingOccurrence.descriptionBullets?.filter(b => b.trim()) ?? [];
 
+      const normalizedEditStatus = normalizeStatusForDb(editingOccurrence.status);
+      const resolvedEditStatus = (editingOccurrence.type ?? 'negative') === 'positive'
+        ? (normalizedEditStatus ?? 'stabilized')
+        : (normalizedEditStatus ?? 'unresolved');
+
       const { error: updateError } = await supabase
         .from('pain_observations')
         .update({
           period: periodCode,
           theme_id: editingOccurrence.themeId,
           theme_type: editingOccurrence.type ?? 'negative',
-          status: normalizeStatusForDb(editingOccurrence.status) ?? 'unresolved',
+          status: resolvedEditStatus,
           months_active: editingOccurrence.monthsActive ?? null,
           percent_of_feedback: editingOccurrence.percentage ?? null,
           narrative: bullets[0] ?? null,
@@ -996,15 +1001,15 @@ export function ManageThemes({
   };
 
   const handlePreview = () => {
-    if (!newOccurrence.themeName || !newOccurrence.percentage || newOccurrence.descriptionBullets?.filter(b => b.trim()).length === 0) {
-      alert('Please fill in all required fields (Title, Percentage, and at least one Description Bullet)');
+    if (!newOccurrence.themeName || newOccurrence.descriptionBullets?.filter(b => b.trim()).length === 0) {
+      alert('Please fill in all required fields (Title and at least one Description Bullet)');
       return;
     }
     setShowPreview(true);
   };
 
   const saveNewOccurrence = async (keepOpen = false) => {
-    if (!newOccurrence.themeName || !newOccurrence.percentage || !newOccurrence.descriptionBullets || newOccurrence.descriptionBullets.filter(b => b.trim()).length === 0) {
+    if (!newOccurrence.themeName || !newOccurrence.descriptionBullets || newOccurrence.descriptionBullets.filter(b => b.trim()).length === 0) {
       return;
     }
 
@@ -1062,6 +1067,11 @@ export function ManageThemes({
       }
 
       const bullets = newOccurrence.descriptionBullets?.filter(b => b.trim()) ?? [];
+      const normalizedStatus = normalizeStatusForDb(newOccurrence.status);
+      const resolvedStatus = (newOccurrence.type ?? 'negative') === 'positive'
+        ? (normalizedStatus ?? 'stabilized')
+        : (normalizedStatus ?? 'unresolved');
+
       const { data: observation, error: observationError } = await supabase
         .from('pain_observations')
         .insert({
@@ -1072,7 +1082,7 @@ export function ManageThemes({
           journey_id: scopeType === 'journey' ? newOccurrence.journeyId : null,
           theme_type: newOccurrence.type ?? 'negative',
           severity: 'medium',
-          status: normalizeStatusForDb(newOccurrence.status) ?? 'unresolved',
+          status: resolvedStatus,
           months_active: newOccurrence.monthsActive ?? null,
           mentions_count: null,
           percent_of_feedback: newOccurrence.percentage ?? null,
@@ -1148,7 +1158,7 @@ export function ManageThemes({
   };
 
   const updateNewOccurrence = (field: keyof Partial<ThemeOccurrence>, value: any) => {
-    setNewOccurrence({ ...newOccurrence, [field]: value });
+    setNewOccurrence((prev) => ({ ...prev, [field]: value }));
   };
 
   const updateDescriptionBullet = (index: number, value: string, isNew: boolean) => {
@@ -1280,8 +1290,8 @@ export function ManageThemes({
   };
 
   const getStatusBadge = (status?: 'unresolved' | 'improving' | 'stabilized' | 'resolved-monitoring', type?: 'positive' | 'negative' | 'neutral') => {
-    if (type === 'positive' && !status) {
-      return { label: 'Stabilized', color: 'text-green-800', bgColor: 'bg-green-100' };
+    if (type === 'positive') {
+      return null;
     }
     if (!status) return { label: 'Unresolved', color: 'text-red-800', bgColor: 'bg-red-100' };
 
@@ -1495,7 +1505,9 @@ export function ManageThemes({
                           <div className="font-medium text-sm">{existingTheme.title}</div>
                           <div className="text-xs text-slate-600 mt-1 flex items-center gap-3">
                             <span className="font-semibold">{existingTheme.appName}</span>
-                            <span>{existingTheme.percentage}%</span>
+                            <span>
+                              {existingTheme.percentage == null ? '—' : `${existingTheme.percentage}%`}
+                            </span>
                             <span className={existingTheme.type === 'positive' ? 'text-green-700' : existingTheme.type === 'negative' ? 'text-red-700' : 'text-slate-700'}>
                               {existingTheme.type}
                             </span>
@@ -1509,17 +1521,23 @@ export function ManageThemes({
               </div>
 
               <div className="space-y-2">
-                <Label>
-                  Percentage <span className="text-red-600">*</span>
-                </Label>
+                <Label>Percentage</Label>
                 <Input
                   type="number"
                   min="0"
                   max="100"
-                  value={currentOccurrence.percentage || ''}
-                  onChange={(e) => isNew ? updateNewOccurrence('percentage', parseFloat(e.target.value)) : updateEditingOccurrence('percentage', parseFloat(e.target.value))}
+                  value={currentOccurrence.percentage ?? ''}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    const parsed = value === '' ? null : Number(value);
+                    const nextValue = Number.isNaN(parsed) ? null : parsed;
+                    if (isNew) {
+                      updateNewOccurrence('percentage', nextValue);
+                    } else {
+                      updateEditingOccurrence('percentage', nextValue);
+                    }
+                  }}
                   placeholder="0-100"
-                  required
                 />
                 <p className="text-xs text-slate-500">What % of feedback mentions this theme?</p>
               </div>
@@ -1534,18 +1552,17 @@ export function ManageThemes({
                   onValueChange={(value) => {
                     const newType = value as 'positive' | 'negative' | 'neutral';
                     if (isNew) {
-                      updateNewOccurrence('type', newType);
-                      if (newType === 'negative') {
-                        updateNewOccurrence('status', 'unresolved');
-                      } else if (newType === 'positive') {
-                        updateNewOccurrence('status', 'stabilized');
-                      }
+                      setNewOccurrence((prev) => ({
+                        ...prev,
+                        type: newType,
+                        status: newType === 'negative' ? 'unresolved' : undefined,
+                      }));
                     } else {
                       updateEditingOccurrence('type', newType);
                       if (newType === 'negative') {
                         updateEditingOccurrence('status', 'unresolved');
-                      } else if (newType === 'positive') {
-                        updateEditingOccurrence('status', 'stabilized');
+                      } else {
+                        updateEditingOccurrence('status', undefined);
                       }
                     }
                   }}
@@ -1565,20 +1582,33 @@ export function ManageThemes({
               <div className="space-y-2">
                 <Label>Status</Label>
                 <Select 
-                  value={currentOccurrence.status || 'unresolved'} 
-                  onValueChange={(value) => isNew ? updateNewOccurrence('status', value) : updateEditingOccurrence('status', value)}
+                  value={currentOccurrence.type === 'positive' ? 'none' : (currentOccurrence.status ?? 'none')} 
+                  onValueChange={(value) => {
+                    const nextStatus = value === 'none' ? undefined : value;
+                    if (isNew) {
+                      updateNewOccurrence('status', nextStatus);
+                    } else {
+                      updateEditingOccurrence('status', nextStatus);
+                    }
+                  }}
+                  disabled={currentOccurrence.type === 'positive'}
                 >
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
+                    <SelectItem value="none">None</SelectItem>
                     <SelectItem value="unresolved">Unresolved</SelectItem>
                     <SelectItem value="improving">Improving</SelectItem>
                     <SelectItem value="stabilized">Stabilized</SelectItem>
                     <SelectItem value="resolved-monitoring">Resolved - Monitoring</SelectItem>
                   </SelectContent>
                 </Select>
-                <p className="text-xs text-slate-500">Current state of this issue or driver</p>
+                <p className="text-xs text-slate-500">
+                  {currentOccurrence.type === 'positive'
+                    ? 'Status is not applicable for positive themes.'
+                    : 'Current state of this issue or driver'}
+                </p>
               </div>
             </div>
 
@@ -2308,7 +2338,7 @@ export function ManageThemes({
                           }`}>
                             {newOccurrence.type === 'positive' ? 'Positive' : newOccurrence.type === 'negative' ? 'Pain Point' : 'Neutral'}
                           </span>
-                          {newOccurrence.status && (
+                          {getStatusBadge(newOccurrence.status, newOccurrence.type) && (
                             <span className={`text-xs px-2 py-1 rounded font-medium ${getStatusBadge(newOccurrence.status, newOccurrence.type)?.bgColor} ${getStatusBadge(newOccurrence.status, newOccurrence.type)?.color}`}>
                               {getStatusBadge(newOccurrence.status, newOccurrence.type)?.label}
                             </span>
@@ -2342,7 +2372,10 @@ export function ManageThemes({
                           <div><strong>Journey:</strong> {newOccurrence.journeyName}</div>
                         )}
                         <div><strong>Period:</strong> {newOccurrence.timePeriod || 'November 2025'}</div>
-                        <div><strong>Percentage:</strong> {newOccurrence.percentage || 0}% of feedback</div>
+                        <div>
+                          <strong>Percentage:</strong>{' '}
+                          {newOccurrence.percentage == null ? 'Not provided' : `${newOccurrence.percentage}% of feedback`}
+                        </div>
                       </div>
 
                       {/* Summary Points */}
@@ -2390,7 +2423,7 @@ export function ManageThemes({
               <Button variant="outline" onClick={cancelAddingNew}>
                 Cancel
               </Button>
-              <Button
+              <Button 
                 variant="outline"
                 onClick={() => saveNewOccurrence(true)}
                 disabled={isSaving}
@@ -2558,7 +2591,7 @@ export function ManageThemes({
                               }`}>
                                 {topOccurrence.type === 'positive' ? 'Positive' : topOccurrence.type === 'negative' ? 'Pain Point' : 'Neutral'}
                               </span>
-                              {topOccurrence.status && (
+                              {getStatusBadge(topOccurrence.status, topOccurrence.type) && (
                                 <span className={`text-xs px-2 py-1 rounded font-medium ${getStatusBadge(topOccurrence.status, topOccurrence.type)?.bgColor} ${getStatusBadge(topOccurrence.status, topOccurrence.type)?.color}`}>
                                   {getStatusBadge(topOccurrence.status, topOccurrence.type)?.label}
                                 </span>
@@ -2698,7 +2731,7 @@ export function ManageThemes({
                                   }`}>
                                     {occurrence.type === 'positive' ? 'Positive' : occurrence.type === 'negative' ? 'Pain Point' : 'Neutral'}
                                   </span>
-                                  {occurrence.status && (
+                                  {getStatusBadge(occurrence.status, occurrence.type) && (
                                     <span className={`text-xs px-2 py-1 rounded font-medium ${getStatusBadge(occurrence.status, occurrence.type)?.bgColor} ${getStatusBadge(occurrence.status, occurrence.type)?.color}`}>
                                       {getStatusBadge(occurrence.status, occurrence.type)?.label}
                                     </span>
@@ -2772,7 +2805,7 @@ export function ManageThemes({
                 } else {
                   // Render single card (no stacking)
                   const occurrence = topOccurrence;
-                return (
+                  return (
               <Card key={occurrence.id} className="p-4 hover:shadow-md transition-shadow relative">
                 {/* Edit Button - Top Right */}
                 <div className="absolute top-3 right-3">
@@ -2796,7 +2829,7 @@ export function ManageThemes({
                       }`}>
                         {occurrence.type === 'positive' ? 'Positive' : occurrence.type === 'negative' ? 'Pain Point' : 'Neutral'}
                       </span>
-                      {occurrence.status && (
+                      {getStatusBadge(occurrence.status, occurrence.type) && (
                         <span className={`text-xs px-2 py-1 rounded font-medium ${getStatusBadge(occurrence.status, occurrence.type)?.bgColor} ${getStatusBadge(occurrence.status, occurrence.type)?.color}`}>
                           {getStatusBadge(occurrence.status, occurrence.type)?.label}
                         </span>
@@ -3040,7 +3073,7 @@ export function ManageThemes({
                                   <div className="font-medium text-slate-900">{occ.appName}</div>
                                   <div className="text-slate-500">{occ.timePeriod} • {occ.percentage}% of feedback</div>
                                 </div>
-                                {occ.status && (
+                                {getStatusBadge(occ.status, occ.type) && (
                                   <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${getStatusBadge(occ.status, occ.type)?.bgColor} ${getStatusBadge(occ.status, occ.type)?.color}`}>
                                     {getStatusBadge(occ.status, occ.type)?.label}
                                   </span>
@@ -3137,7 +3170,10 @@ export function ManageThemes({
                           <div><strong>Journey:</strong> {editingOccurrence.journeyName}</div>
                         )}
                         <div><strong>Period:</strong> {editingOccurrence?.timePeriod || 'November 2025'}</div>
-                        <div><strong>Percentage:</strong> {editingOccurrence?.percentage || 0}% of feedback</div>
+                        <div>
+                          <strong>Percentage:</strong>{' '}
+                          {editingOccurrence?.percentage == null ? 'Not provided' : `${editingOccurrence.percentage}% of feedback`}
+                        </div>
                       </div>
 
                       {/* Summary Points */}
@@ -3184,17 +3220,17 @@ export function ManageThemes({
                   Delete
                 </Button>
                 <div className="flex gap-2">
-                  <Button variant="outline" onClick={cancelEditing}>
-                    Cancel
-                  </Button>
-                  <Button 
-                    onClick={saveOccurrence}
-                    disabled={isSaving || !editingOccurrence?.themeName || editingOccurrence.themeName.trim() === '' || !editingOccurrence.percentage}
-                    style={{ backgroundColor: '#ff6900' }}
-                    className="text-white hover:opacity-90 active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
+                <Button variant="outline" onClick={cancelEditing}>
+                  Cancel
+                </Button>
+                <Button 
+                  onClick={saveOccurrence}
+                  disabled={isSaving || !editingOccurrence?.themeName || editingOccurrence.themeName.trim() === ''}
+                  style={{ backgroundColor: '#ff6900' }}
+                  className="text-white hover:opacity-90 active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
+                >
                     {isSaving ? 'Saving...' : 'Save Changes'}
-                  </Button>
+                </Button>
                 </div>
               </div>
             </Card>
