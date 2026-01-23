@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { FileDown, ChevronDown, ChevronUp, Download } from 'lucide-react';
 import { Button } from './ui/button';
 import { Card } from './ui/card';
@@ -873,7 +873,7 @@ function AppDetailPage({
     <div className="relative w-full aspect-[16/9] bg-white flex">
       {/* Left Sidebar - 17% width */}
       <div className="w-[17%] bg-[#2D2D2D] text-white px-5 py-5 flex flex-col items-center text-center">
-        <h2 className="text-2xl font-bold mb-2 leading-tight">{app.name}</h2>
+        <h2 className="text-[22px] font-bold mb-2 leading-tight">{app.name}</h2>
         <p className="text-lg font-bold mb-6">{selectedMonth}</p>
         
         <div className="mb-6">
@@ -1014,6 +1014,8 @@ export function ExportReport({
   onNavigateTopPains,
   onNavigateAdmin,
 }: ExportReportProps) {
+  const previewPanelRef = useRef<HTMLDivElement>(null);
+  const [previewScale, setPreviewScale] = useState(1);
   const [config, setConfig] = useState<ExportConfig>({
     sections: {
       scores: true,
@@ -1274,6 +1276,24 @@ export function ExportReport({
     hasInitializedMonth,
     monthLabelToCode,
   ]);
+
+  useEffect(() => {
+    const baseWidth = 1100;
+    const padding = 64;
+
+    const updateScale = () => {
+      const panelWidth = previewPanelRef.current?.clientWidth ?? 0;
+      if (!panelWidth) return;
+      const nextScale = (panelWidth - padding) / baseWidth;
+      setPreviewScale(Number.isFinite(nextScale) && nextScale > 0 ? Math.min(1, nextScale) : 1);
+    };
+
+    updateScale();
+    window.addEventListener('resize', updateScale);
+    return () => {
+      window.removeEventListener('resize', updateScale);
+    };
+  }, []);
 
 
   useEffect(() => {
@@ -1618,6 +1638,16 @@ export function ExportReport({
   return (
     <div className="min-h-screen bg-slate-50">
       <style>{`
+        @media screen {
+          .export-preview-panel .export-page {
+            width: 1100px;
+            height: auto;
+          }
+          .export-preview-panel .export-slide {
+            width: 100%;
+            height: auto;
+          }
+        }
         @media print {
           @page {
             size: landscape;
@@ -1639,6 +1669,7 @@ export function ExportReport({
             padding: 0 !important;
             overflow: visible !important;
             background: white !important;
+            zoom: 1 !important;
           }
           .export-preview-panel h3 {
             display: none !important;
@@ -1908,7 +1939,11 @@ export function ExportReport({
         </div>
 
         {/* Right Preview Panel - Landscape Pages */}
-        <div className="export-preview-panel flex-1 bg-gray-100 overflow-y-auto p-8">
+        <div
+          ref={previewPanelRef}
+          className="export-preview-panel flex-1 bg-gray-100 overflow-y-auto p-8"
+          style={{ zoom: previewScale }}
+        >
           <div className="max-w-6xl mx-auto space-y-8">
             <h3 className="text-lg font-semibold text-gray-700 mb-4">Report Preview</h3>
             
