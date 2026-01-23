@@ -85,7 +85,7 @@ function App() {
   const [adminShowButton, setAdminShowButton] = useState(() => (localStorage.getItem('adminShowButton') ?? 'true') !== 'false');
   const [adminAuthenticated, setAdminAuthenticated] = useState(() => sessionStorage.getItem('adminAuthed') === 'true');
   const [dashboardPassword, setDashboardPassword] = useState(() => localStorage.getItem('dashboardPassword') ?? 'hammertime');
-  const [dashboardAuthEnabled, setDashboardAuthEnabled] = useState(() => (localStorage.getItem('dashboardAuthEnabled') ?? 'false') === 'true');
+  const [dashboardAuthEnabled, setDashboardAuthEnabled] = useState(() => (localStorage.getItem('dashboardAuthEnabled') ?? 'true') === 'true');
   const [dashboardAuthenticated, setDashboardAuthenticated] = useState(() => sessionStorage.getItem('dashboardAuthed') === 'true');
   const [isAdminDialogOpen, setIsAdminDialogOpen] = useState(false);
   const [isDashboardDialogOpen, setIsDashboardDialogOpen] = useState(false);
