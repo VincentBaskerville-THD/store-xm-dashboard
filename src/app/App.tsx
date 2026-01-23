@@ -108,9 +108,29 @@ function App() {
     format: 'month',
     period: 'November 2025',
   });
-  const [featureFlags, setFeatureFlags] = useState<FeatureFlags>({
+  const [globalFeatureFlags, setGlobalFeatureFlags] = useState<FeatureFlags>({
     keyJourneysEnabled: false,
     topPainsEnabled: false,
+  });
+  const [localFeatureFlags, setLocalFeatureFlags] = useState<FeatureFlags>(() => {
+    const stored = localStorage.getItem('featureFlagsLocal');
+    if (!stored) {
+      return { keyJourneysEnabled: false, topPainsEnabled: false };
+    }
+    try {
+      const parsed = JSON.parse(stored) as Partial<FeatureFlags>;
+      return {
+        keyJourneysEnabled: Boolean(parsed.keyJourneysEnabled),
+        topPainsEnabled: Boolean(parsed.topPainsEnabled),
+      };
+    } catch {
+      return { keyJourneysEnabled: false, topPainsEnabled: false };
+    }
+  });
+  const [useLocalFeatureFlags, setUseLocalFeatureFlags] = useState(() => {
+    const stored = localStorage.getItem('featureFlagsUseLocal');
+    if (stored !== null) return stored === 'true';
+    return import.meta.env.DEV;
   });
   const [settingsLoaded, setSettingsLoaded] = useState(false);
 
@@ -148,8 +168,8 @@ function App() {
         adminPassword: data.admin_password ?? adminPassword,
         dashboardAuthEnabled: data.dashboard_auth_enabled ?? dashboardAuthEnabled,
         dashboardPassword: data.dashboard_password ?? dashboardPassword,
-        keyJourneysEnabled: data.key_journeys_enabled ?? featureFlags.keyJourneysEnabled,
-        topPainsEnabled: data.top_pains_enabled ?? featureFlags.topPainsEnabled,
+        keyJourneysEnabled: data.key_journeys_enabled ?? globalFeatureFlags.keyJourneysEnabled,
+        topPainsEnabled: data.top_pains_enabled ?? globalFeatureFlags.topPainsEnabled,
       };
 
       localStorage.setItem('adminAuthEnabled', String(nextSettings.adminAuthEnabled));
@@ -163,7 +183,7 @@ function App() {
       setAdminPassword(nextSettings.adminPassword);
       setDashboardAuthEnabled(nextSettings.dashboardAuthEnabled);
       setDashboardPassword(nextSettings.dashboardPassword);
-      setFeatureFlags({
+      setGlobalFeatureFlags({
         keyJourneysEnabled: nextSettings.keyJourneysEnabled,
         topPainsEnabled: nextSettings.topPainsEnabled,
       });
@@ -188,8 +208,8 @@ function App() {
           admin_password: adminPassword,
           dashboard_auth_enabled: dashboardAuthEnabled,
           dashboard_password: dashboardPassword,
-          key_journeys_enabled: featureFlags.keyJourneysEnabled,
-          top_pains_enabled: featureFlags.topPainsEnabled,
+          key_journeys_enabled: globalFeatureFlags.keyJourneysEnabled,
+          top_pains_enabled: globalFeatureFlags.topPainsEnabled,
         });
 
       if (error) {
@@ -204,10 +224,20 @@ function App() {
     adminPassword,
     dashboardAuthEnabled,
     dashboardPassword,
-    featureFlags.keyJourneysEnabled,
-    featureFlags.topPainsEnabled,
+    globalFeatureFlags.keyJourneysEnabled,
+    globalFeatureFlags.topPainsEnabled,
     settingsLoaded,
   ]);
+
+  useEffect(() => {
+    localStorage.setItem('featureFlagsLocal', JSON.stringify(localFeatureFlags));
+  }, [localFeatureFlags]);
+
+  useEffect(() => {
+    localStorage.setItem('featureFlagsUseLocal', String(useLocalFeatureFlags));
+  }, [useLocalFeatureFlags]);
+
+  const effectiveFeatureFlags = useLocalFeatureFlags ? localFeatureFlags : globalFeatureFlags;
 
   const pushToHistory = (view: ViewType, appId?: string | null, journeyId?: string | null) => {
     const newState: NavigationState = {
@@ -556,7 +586,7 @@ function App() {
           onNavigateTopPains={navigateToTopPains}
           onNavigateAdmin={requestAdminAccess}
           onNavigateExport={navigateToExport}
-          isFeatureEnabled={featureFlags.keyJourneysEnabled}
+          isFeatureEnabled={effectiveFeatureFlags.keyJourneysEnabled}
           showAdminButton={adminShowButton}
         />
       )}
@@ -596,7 +626,7 @@ function App() {
           onNavigateTopPains={navigateToTopPains}
           onNavigateAdmin={navigateToAdminThemes}
           onNavigateExport={navigateToExport}
-          isFeatureEnabled={featureFlags.topPainsEnabled}
+          isFeatureEnabled={effectiveFeatureFlags.topPainsEnabled}
           showAdminButton={adminShowButton}
         />
       )}
@@ -638,8 +668,16 @@ function App() {
           onNavigateKeyJourneys={navigateToAllJourneys}
           onNavigateTopPains={navigateToTopPains}
           onTabChange={handleAdminTabChange}
-          flags={featureFlags}
-          onFlagsChange={setFeatureFlags}
+          flags={effectiveFeatureFlags}
+          onFlagsChange={(nextFlags) => {
+            if (useLocalFeatureFlags) {
+              setLocalFeatureFlags(nextFlags);
+            } else {
+              setGlobalFeatureFlags(nextFlags);
+            }
+          }}
+          useLocalOverrides={useLocalFeatureFlags}
+          onUseLocalOverridesChange={setUseLocalFeatureFlags}
         />
       )}
       {currentView === 'admin-settings' && (

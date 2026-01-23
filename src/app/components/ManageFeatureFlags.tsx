@@ -18,6 +18,8 @@ interface ManageFeatureFlagsProps {
   onTabChange: (tab: 'manage-themes' | 'manage-journeys' | 'manage-apps' | 'feature-flags' | 'settings') => void;
   flags: FeatureFlags;
   onFlagsChange: (nextFlags: FeatureFlags) => void;
+  useLocalOverrides?: boolean;
+  onUseLocalOverridesChange?: (enabled: boolean) => void;
 }
 
 export function ManageFeatureFlags({
@@ -29,6 +31,8 @@ export function ManageFeatureFlags({
   onTabChange,
   flags,
   onFlagsChange,
+  useLocalOverrides,
+  onUseLocalOverridesChange,
 }: ManageFeatureFlagsProps) {
   const navItems = [
     { id: 'portfolio', label: 'Portfolio', onClick: onNavigateHome || onNavigateBack },
@@ -81,6 +85,19 @@ export function ManageFeatureFlags({
           </div>
 
           <div className="grid gap-4">
+            <div className="flex items-center justify-between rounded-lg border border-slate-200 p-4">
+              <div>
+                <p className="font-medium text-slate-900">Use local overrides</p>
+                <p className="text-sm text-slate-600">
+                  When enabled, these flags only apply on this device.
+                </p>
+              </div>
+              <Switch
+                checked={Boolean(useLocalOverrides)}
+                onCheckedChange={(checked) => onUseLocalOverridesChange?.(checked)}
+              />
+            </div>
+
             <div className="flex items-center justify-between rounded-lg border border-slate-200 p-4">
               <div>
                 <p className="font-medium text-slate-900">Key Journeys content</p>
