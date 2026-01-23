@@ -1152,9 +1152,7 @@ export function ManageThemes({
   };
 
   const updateEditingOccurrence = (field: keyof ThemeOccurrence, value: any) => {
-    if (editingOccurrence) {
-      setEditingOccurrence({ ...editingOccurrence, [field]: value });
-    }
+    setEditingOccurrence((prev) => (prev ? { ...prev, [field]: value } : prev));
   };
 
   const updateNewOccurrence = (field: keyof Partial<ThemeOccurrence>, value: any) => {

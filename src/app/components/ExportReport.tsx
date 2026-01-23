@@ -93,7 +93,7 @@ type ThemeObservationRow = {
 
 type FeedbackTheme = {
   category: string;
-  percentage: number;
+  percentage: number | null;
   items: string[];
 };
 
@@ -540,7 +540,7 @@ function AppDetailPage({
         const items = bullets.length > 0 ? bullets : row.narrative ? [row.narrative] : [];
         return {
           category: titleMap[row.theme_id ?? ''] ?? 'Untitled Theme',
-          percentage: row.percent_of_feedback ?? 0,
+          percentage: row.percent_of_feedback ?? null,
           items,
         };
       });
@@ -980,7 +980,10 @@ function AppDetailPage({
                 <div className="flex items-center gap-3 mb-2">
                   <div className="w-1 h-5 bg-[#F96302] rounded-sm"></div>
                   <h4 className="text-base font-bold flex-1">
-                    {theme.category} <span className="font-bold">({theme.percentage}%)</span>
+                    {theme.category}
+                    {theme.percentage != null && (
+                      <span className="font-bold"> ({theme.percentage}%)</span>
+                    )}
                   </h4>
                 </div>
                 
@@ -1577,8 +1580,7 @@ export function ExportReport({
     declineCount: apps.filter(app => app.scoreMoM < -2).length,
   });
 
-  const pendoHighlights = calculateHighlights(pendoApps);
-  const medalliaHighlights = calculateHighlights(medalliaApps);
+  const reportHighlights = calculateHighlights(selectedAppsData);
 
   // Sort apps based on config
   const sortApps = (apps: typeof selectedAppsData) => {
@@ -1981,7 +1983,7 @@ export function ExportReport({
                         month={reportPeriodShortLabel}
                         apps={sortApps(pendoApps)}
                         metricsSystem="Pendo"
-                        highlights={pendoHighlights}
+                        highlights={reportHighlights}
                       />
                     </div>
                   </div>
@@ -1996,7 +1998,7 @@ export function ExportReport({
                         month={reportPeriodShortLabel}
                         apps={sortApps(medalliaApps)}
                         metricsSystem="Medallia"
-                        highlights={medalliaHighlights}
+                        highlights={reportHighlights}
                       />
                     </div>
                   </div>
