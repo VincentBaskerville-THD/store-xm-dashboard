@@ -1065,7 +1065,7 @@ export function TopPains({
           <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 gap-3">
             <div>
               <h2 className="text-slate-900">Pain Point Analysis</h2>
-              <p className="text-slate-600">Top issues and resolution progress</p>
+              <p className="text-slate-600">Top issues reported via feedback</p>
             </div>
             
             {/* View Toggle */}
