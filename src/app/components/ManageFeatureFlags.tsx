@@ -1,3 +1,4 @@
+import React from 'react';
 import { Flag } from 'lucide-react';
 import { Button } from './ui/button';
 import { Card } from './ui/card';
@@ -15,7 +16,7 @@ interface ManageFeatureFlagsProps {
   onNavigateAllApps?: () => void;
   onNavigateKeyJourneys?: () => void;
   onNavigateTopPains?: () => void;
-  onTabChange: (tab: 'manage-themes' | 'manage-journeys' | 'manage-apps' | 'feature-flags' | 'settings') => void;
+  onTabChange: (tab: 'manage-themes' | 'manage-top-pains' | 'manage-journeys' | 'manage-apps' | 'feature-flags' | 'settings') => void;
   flags: FeatureFlags;
   onFlagsChange: (nextFlags: FeatureFlags) => void;
   useLocalOverrides?: boolean;

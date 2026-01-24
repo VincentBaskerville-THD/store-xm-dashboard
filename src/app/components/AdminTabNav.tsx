@@ -2,13 +2,14 @@ import React from 'react';
 import { FileText, Database, Map, Settings, Lock, Flag } from 'lucide-react';
 
 interface AdminTabNavProps {
-  activeTab: 'manage-themes' | 'manage-journeys' | 'manage-apps' | 'feature-flags' | 'settings';
-  onTabChange: (tab: 'manage-themes' | 'manage-journeys' | 'manage-apps' | 'feature-flags' | 'settings') => void;
+  activeTab: 'manage-themes' | 'manage-top-pains' | 'manage-journeys' | 'manage-apps' | 'feature-flags' | 'settings';
+  onTabChange: (tab: 'manage-themes' | 'manage-top-pains' | 'manage-journeys' | 'manage-apps' | 'feature-flags' | 'settings') => void;
 }
 
 export function AdminTabNav({ activeTab, onTabChange }: AdminTabNavProps) {
   const tabs = [
     { id: 'manage-themes' as const, label: 'Manage Themes', icon: Database },
+    { id: 'manage-top-pains' as const, label: 'Manage Top Pains', icon: FileText },
     { id: 'manage-journeys' as const, label: 'Manage Journeys', icon: Map },
     { id: 'manage-apps' as const, label: 'Manage Apps', icon: Settings },
     { id: 'feature-flags' as const, label: 'Feature Flags', icon: Flag },

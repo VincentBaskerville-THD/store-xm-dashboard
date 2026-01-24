@@ -10,6 +10,7 @@ import { TimeSeriesView } from './components/TimeSeriesView';
 import { AllAppsTimeGrid } from './components/AllAppsTimeGrid';
 import { TopPains } from './components/TopPains';
 import { ManageThemes } from './components/ManageThemes';
+import { ManageTopPains } from './components/ManageTopPains';
 import { ManageJourneys } from './components/ManageJourneys';
 import { ManageApps } from './components/ManageApps';
 import { ManageSettings } from './components/ManageSettings';
@@ -33,6 +34,7 @@ export type ViewType =
   | 'apps-time-grid-practitioner'
   | 'top-pains'
   | 'admin-manage-themes'
+  | 'admin-manage-top-pains'
   | 'admin-manage-journeys'
   | 'admin-manage-apps'
   | 'admin-feature-flags'
@@ -326,6 +328,14 @@ function App() {
     syncPath('admin-manage-themes');
   };
 
+  const navigateToManageTopPains = () => {
+    pushToHistory('admin-manage-top-pains', null, null);
+    setCurrentView('admin-manage-top-pains');
+    setSelectedApp(null);
+    setSelectedJourney(null);
+    syncPath('admin-manage-top-pains');
+  };
+
   const navigateToManageJourneys = () => {
     pushToHistory('admin-manage-journeys', null, null);
     setCurrentView('admin-manage-journeys');
@@ -424,9 +434,11 @@ function App() {
     window.addEventListener('popstate', handlePath);
     return () => window.removeEventListener('popstate', handlePath);
   }, [adminAuthEnabled, adminAuthenticated, adminPath]);
-  const handleAdminTabChange = (tab: 'manage-themes' | 'manage-journeys' | 'manage-apps' | 'feature-flags' | 'settings') => {
+  const handleAdminTabChange = (tab: 'manage-themes' | 'manage-top-pains' | 'manage-journeys' | 'manage-apps' | 'feature-flags' | 'settings') => {
     if (tab === 'manage-themes') {
       navigateToManageThemes();
+    } else if (tab === 'manage-top-pains') {
+      navigateToManageTopPains();
     } else if (tab === 'manage-journeys') {
       navigateToManageJourneys();
     } else if (tab === 'manage-apps') {
@@ -632,6 +644,16 @@ function App() {
       )}
       {currentView === 'admin-manage-themes' && (
         <ManageThemes
+          onNavigateBack={navigateBack}
+          onNavigateHome={navigateToPortfolio}
+          onNavigateAllApps={navigateToAllApps}
+          onNavigateKeyJourneys={navigateToAllJourneys}
+          onNavigateTopPains={navigateToTopPains}
+          onTabChange={handleAdminTabChange}
+        />
+      )}
+      {currentView === 'admin-manage-top-pains' && (
+        <ManageTopPains
           onNavigateBack={navigateBack}
           onNavigateHome={navigateToPortfolio}
           onNavigateAllApps={navigateToAllApps}
