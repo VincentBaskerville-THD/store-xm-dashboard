@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { FileDown, ChevronDown, ChevronUp, Download } from 'lucide-react';
+import { FileDown, ChevronDown, ChevronUp, Download, Eye, X } from 'lucide-react';
 import { Button } from './ui/button';
 import { Card } from './ui/card';
 import { NavigationHeader } from './NavigationHeader';
@@ -1095,6 +1095,8 @@ export function ExportReport({
   const [hasInitializedMonth, setHasInitializedMonth] = useState(false);
 
   const [showAdvancedSettings, setShowAdvancedSettings] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+  const [showMobilePreview, setShowMobilePreview] = useState(false);
 
   const toggleSection = (section: string) => {
     if (section === 'journeys' || section === 'pains') return;
@@ -1299,6 +1301,24 @@ export function ExportReport({
     return () => {
       window.removeEventListener('resize', updateScale);
     };
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const media = window.matchMedia('(max-width: 1024px)');
+    const handleChange = () => {
+      setIsMobile(media.matches);
+      if (media.matches) {
+        setShowMobilePreview(false);
+      }
+    };
+    handleChange();
+    if (media.addEventListener) {
+      media.addEventListener('change', handleChange);
+      return () => media.removeEventListener('change', handleChange);
+    }
+    media.addListener(handleChange);
+    return () => media.removeListener(handleChange);
   }, []);
 
 
@@ -1675,6 +1695,11 @@ export function ExportReport({
             overflow: visible !important;
             background: white !important;
             zoom: 1 !important;
+            display: block !important;
+            position: static !important;
+          }
+          .export-mobile-toggle {
+            display: none !important;
           }
           .export-preview-panel h3 {
             display: none !important;
@@ -1728,9 +1753,25 @@ export function ExportReport({
         />
       </div>
 
-      <div className="flex h-[calc(100vh-80px)]">
+      {isMobile && (
+        <div className="export-mobile-toggle fixed bottom-4 right-4 z-50">
+          <Button
+            onClick={() => setShowMobilePreview((prev) => !prev)}
+            className="bg-orange-600 hover:bg-orange-700 text-white shadow-lg rounded-full h-14 w-14 p-0"
+            aria-label={showMobilePreview ? 'Hide preview' : 'Show preview'}
+          >
+            {showMobilePreview ? <X size={24} /> : <Eye size={24} />}
+          </Button>
+        </div>
+      )}
+
+      <div className="flex h-[calc(100vh-80px)] flex-col lg:flex-row">
         {/* Left Configuration Panel */}
-        <div className="export-config-panel w-80 bg-white border-r border-gray-200 overflow-y-auto">
+        <div
+          className={`export-config-panel w-full lg:w-80 bg-white border-r border-gray-200 overflow-y-auto ${
+            isMobile && showMobilePreview ? 'hidden' : 'block'
+          }`}
+        >
           <div className="p-6">
             <h2 className="text-lg font-semibold mb-4">Report Configuration</h2>
 
@@ -1947,7 +1988,9 @@ export function ExportReport({
         {/* Right Preview Panel - Landscape Pages */}
         <div
           ref={previewPanelRef}
-          className="export-preview-panel flex-1 bg-gray-100 overflow-y-auto p-8"
+          className={`export-preview-panel flex-1 bg-gray-100 overflow-y-auto p-8 ${
+            isMobile ? (showMobilePreview ? 'fixed inset-0 z-40' : 'hidden') : 'block'
+          }`}
           style={{ zoom: previewScale }}
         >
           <div className="max-w-6xl mx-auto space-y-8">
