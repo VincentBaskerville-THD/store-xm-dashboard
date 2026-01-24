@@ -180,19 +180,9 @@ export function ManageTopPains({
     setMappings((mappingRows as ThemeMapping[]) ?? []);
     const cleanedObservations = (observationRows as ObservationRow[]) ?? [];
     if (cleanedObservations.length > 0) {
-      const latestLabel = cleanedObservations[0].period_label ?? cleanedObservations[0].period;
       const negativeObservations = cleanedObservations.filter((row) => row.theme_type === 'negative');
-      const latestObservations = negativeObservations.filter(
-        (row) => (row.period_label ?? row.period) === latestLabel,
-      );
-
-      if (latestObservations.length > 0) {
-        setLatestPeriodLabel(latestLabel ?? null);
-        setObservations(latestObservations);
-      } else {
-        setLatestPeriodLabel('All periods');
-        setObservations(negativeObservations);
-      }
+      setLatestPeriodLabel('All time');
+      setObservations(negativeObservations);
     } else {
       setLatestPeriodLabel(null);
       setObservations([]);

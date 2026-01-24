@@ -1,12 +1,12 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ArrowLeft, FileDown, AlertTriangle, TrendingUp, TrendingDown, AlertCircle, Info, Link2, Clock, X, BarChart3, LineChart, Construction } from 'lucide-react';
 import { Button } from './ui/button';
 import { Card } from './ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
+import { Tooltip, TooltipContent, TooltipTrigger } from './ui/tooltip';
 import type { TimePeriodData } from './TimeSelector';
-import { TimeSelector } from './TimeSelector';
 import { NavigationHeader } from './NavigationHeader';
-import { mockApps, mockJourneys, markMock } from '../data/mockData';
+import { supabase } from '../lib/supabaseClient';
 // TODO: Replace mock pain data once Top Pains is wired to live data.
 
 interface TopPainsProps {
@@ -32,12 +32,49 @@ interface PainPoint {
   trendDirection: 'increasing' | 'decreasing' | 'stable';
   trendPercentage?: number;
   totalMentions: number;
+  estimatedMentionsCount: number;
+  impactScore: number;
   description: string;
   severity: 'high' | 'medium' | 'low';
 }
 
+type NormalizedThemeRow = {
+  id: string;
+  key: string;
+  title: string;
+  description: string | null;
+  category: string | null;
+  is_active: boolean | null;
+};
+
+type ThemeMappingRow = {
+  theme_id: string;
+  normalized_theme_id: string;
+  confidence: number | null;
+};
+
+type ObservationRow = {
+  period: string | null;
+  period_label: string | null;
+  sort_order: number | null;
+  theme_id: string | null;
+  theme_title: string | null;
+  theme_type: string | null;
+  app_id: string | null;
+  app_name: string | null;
+  severity: string | null;
+  status: string | null;
+  months_active: number | null;
+  mentions_count: number | null;
+  mentions_estimated?: boolean | null;
+  percent_of_feedback: number | null;
+  trend_direction: string | null;
+  trend_percentage: number | null;
+  persistence_tag: string | null;
+};
+
 // Mock pain data aggregated from themes across apps/journeys
-const mockPainData: PainPoint[] = [
+const mockPainData: Array<Omit<PainPoint, 'impactScore' | 'estimatedMentionsCount'>> = [
   {
     id: '1',
     title: 'Performance & Loading Speed Issues',
@@ -617,7 +654,6 @@ export function TopPains({
           onNavigateAdmin={onNavigateAdmin}
           onNavigateExport={onNavigateExport}
           showAdminButton={showAdminButton}
-        showAdminButton={showAdminButton}
           title="Top Pains"
           subtitle="Emerging experience issues across the portfolio"
           showExportButton={true}
@@ -640,6 +676,14 @@ export function TopPains({
   const [selectedPainForDetail, setSelectedPainForDetail] = useState<PainPoint | null>(null);
   const [detailPanelOpen, setDetailPanelOpen] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
+  const [painData, setPainData] = useState<PainPoint[]>([]);
+  const [availableApps, setAvailableApps] = useState<string[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [prevStats] = useState<ReturnType<typeof computeSummary> | null>(null);
+  const [recentPeriods, setRecentPeriods] = useState<Array<{ period: string; label: string }>>([]);
+  const [seriesByThemeKey, setSeriesByThemeKey] = useState<Record<string, number[]>>({});
+  const [dataMonthsCount, setDataMonthsCount] = useState<number>(0);
   const itemsPerPage = 10;
 
   // Reset to page 1 when time period changes
@@ -647,315 +691,295 @@ export function TopPains({
     setCurrentPage(1);
   }, [timePeriod.period]);
 
-  // Get time-period multiplier for data variation
-  const getTimePeriodMultiplier = () => {
-    if (timePeriod.format === 'month') {
-      const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
-      const monthIndex = months.findIndex(m => timePeriod.period.includes(m));
-      // Much more variation: 0.60 to 1.30, with specific patterns
-      const baseMultipliers = [0.65, 0.72, 0.85, 0.90, 0.95, 1.02, 1.08, 1.15, 1.22, 1.18, 1.10, 1.05];
-      return monthIndex >= 0 ? baseMultipliers[monthIndex] : 1.0;
-    } else if (timePeriod.format === 'quarter') {
-      const quarters = ['Q1', 'Q2', 'Q3', 'Q4'];
-      const quarterIndex = quarters.findIndex(q => timePeriod.period.includes(q));
-      // Varying patterns: Q1 low, Q2 medium, Q3 high, Q4 medium-high
-      const quarterMultipliers = [0.70, 0.90, 1.15, 1.05];
-      return quarterIndex >= 0 ? quarterMultipliers[quarterIndex] : 1.0;
-    } else if (timePeriod.format === 'year') {
-      const years = ['2022', '2023', '2024', '2025'];
-      const yearIndex = years.findIndex(y => timePeriod.period.includes(y));
-      // Progressive increase over years
-      const yearMultipliers = [0.65, 0.85, 1.05, 1.25];
-      return yearIndex >= 0 ? yearMultipliers[yearIndex] : 1.0;
+  const getStatusMultiplier = (status?: string) => {
+    switch (status) {
+      case 'resolved':
+        return 0.3;
+      case 'stabilized':
+        return 0.6;
+      case 'improving':
+        return 0.85;
+      case 'unresolved':
+      default:
+        return 1;
     }
-    return 1.0;
   };
 
-  const multiplier = getTimePeriodMultiplier();
+  const buildPainPoints = (
+    observations: ObservationRow[],
+    normalizedThemes: NormalizedThemeRow[],
+    mappings: ThemeMappingRow[],
+  ): PainPoint[] => {
+    const normalizedById = new Map(normalizedThemes.map((theme) => [theme.id, theme]));
+    const mappingByThemeId = new Map(mappings.map((mapping) => [mapping.theme_id, mapping]));
+    const grouped = new Map<
+      string,
+      PainPoint & {
+        severityCounts: Record<string, number>;
+        trendCounts: Record<string, number>;
+        monthsTotals: number;
+        percentageTotal: number;
+        statusWeightedMentions: number;
+        hasMentionsData: boolean;
+        estimatedMentionsCount: number;
+      }
+    >();
 
-  // Get previous period label and multiplier for comparisons
-  const getPreviousPeriodInfo = () => {
-    if (timePeriod.format === 'month') {
-      const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
-      const baseMultipliers = [0.65, 0.72, 0.85, 0.90, 0.95, 1.02, 1.08, 1.15, 1.22, 1.18, 1.10, 1.05];
-      const currentIndex = months.findIndex(m => timePeriod.period.includes(m));
-      if (currentIndex > 0) {
-        const prevMonth = months[currentIndex - 1];
-        return { label: prevMonth.slice(0, 3), multiplier: baseMultipliers[currentIndex - 1] };
-      }
-      // If January, compare to December of previous year
-      return { label: 'Dec', multiplier: baseMultipliers[11] };
-    } else if (timePeriod.format === 'quarter') {
-      const quarters = ['Q1', 'Q2', 'Q3', 'Q4'];
-      const quarterMultipliers = [0.70, 0.90, 1.15, 1.05];
-      const currentIndex = quarters.findIndex(q => timePeriod.period.includes(q));
-      if (currentIndex > 0) {
-        const prevQuarter = quarters[currentIndex - 1];
-        return { label: prevQuarter, multiplier: quarterMultipliers[currentIndex - 1] };
-      }
-      // If Q1, compare to Q4 of previous year
-      return { label: 'Q4', multiplier: quarterMultipliers[3] };
-    } else if (timePeriod.format === 'year') {
-      const years = ['2022', '2023', '2024', '2025'];
-      const yearMultipliers = [0.65, 0.85, 1.05, 1.25];
-      const currentIndex = years.findIndex(y => timePeriod.period.includes(y));
-      if (currentIndex > 0) {
-        const prevYear = years[currentIndex - 1];
-        return { label: prevYear, multiplier: yearMultipliers[currentIndex - 1] };
-      }
-      // If 2022, compare to 2021
-      return { label: '2021', multiplier: 0.50 };
-    }
-    return { label: 'prev', multiplier: 1.0 };
-  };
+    observations.forEach((row) => {
+      if (!row.theme_id) return;
+      const mapping = mappingByThemeId.get(row.theme_id);
+      if (!mapping) return;
+      const normalized = normalizedById.get(mapping.normalized_theme_id);
+      if (!normalized || normalized.is_active === false) return;
 
-  const previousPeriod = getPreviousPeriodInfo();
+      if (!grouped.has(normalized.key)) {
+        grouped.set(normalized.key, {
+          id: normalized.key,
+          title: normalized.title,
+          percentage: 0,
+          affectedApps: [],
+          monthsActive: 0,
+          trendDirection: 'stable',
+          totalMentions: 0,
+          estimatedMentionsCount: 0,
+          impactScore: 0,
+          description: normalized.description ?? '',
+          severity: 'low',
+          severityCounts: { high: 0, medium: 0, low: 0 },
+          trendCounts: { increasing: 0, decreasing: 0, stable: 0 },
+          monthsTotals: 0,
+          percentageTotal: 0,
+          statusWeightedMentions: 0,
+          hasMentionsData: false,
+        });
+      }
 
-  // Calculate previous period statistics for comparison
-  const getPreviousPeriodStats = () => {
-    const prevData = mockPainData.map(pain => {
-      const adjustedPercentage = Math.round(pain.percentage * previousPeriod.multiplier);
-      const adjustedMentions = Math.round(pain.totalMentions * previousPeriod.multiplier);
-      const adjustedMonthsActive = Math.max(1, Math.round(pain.monthsActive * (0.7 + previousPeriod.multiplier * 0.3)));
-      
-      // Dynamically determine severity based on adjusted percentage
-      let adjustedSeverity: 'high' | 'medium' | 'low';
-      if (adjustedPercentage >= 25) {
-        adjustedSeverity = 'high';
-      } else if (adjustedPercentage >= 15) {
-        adjustedSeverity = 'medium';
-      } else {
-        adjustedSeverity = 'low';
+      const group = grouped.get(normalized.key)!;
+      const severity = (row.severity ?? 'low') as 'high' | 'medium' | 'low';
+      if (row.mentions_count !== null && row.mentions_count !== undefined) {
+        group.hasMentionsData = true;
+        group.totalMentions += row.mentions_count;
       }
-      
-      // Dynamically determine trend based on multiplier
-      let adjustedTrend: 'increasing' | 'decreasing' | 'stable';
-      if (previousPeriod.multiplier > 1.10) {
-        adjustedTrend = pain.percentage > 20 ? 'increasing' : 'stable';
-      } else if (previousPeriod.multiplier < 0.80) {
-        adjustedTrend = pain.percentage > 20 ? 'decreasing' : 'stable';
-      } else {
-        adjustedTrend = pain.trendDirection;
+      const baseMentions = row.mentions_count ?? row.percent_of_feedback ?? 0;
+      group.statusWeightedMentions += baseMentions * getStatusMultiplier(row.status ?? undefined);
+      group.percentageTotal += row.percent_of_feedback ?? 0;
+      if (row.mentions_estimated) {
+        group.estimatedMentionsCount += row.mentions_count ?? 0;
       }
-      
-      return {
-        ...pain,
-        percentage: adjustedPercentage,
-        totalMentions: adjustedMentions,
-        monthsActive: adjustedMonthsActive,
-        severity: adjustedSeverity,
-        trendDirection: adjustedTrend,
-      };
+      group.affectedApps.push(row.app_name ?? row.app_id ?? 'Unknown');
+      group.monthsTotals += row.months_active ?? 0;
+      group.severityCounts[severity] += 1;
+      const trend = row.trend_direction ?? 'stable';
+      if (trend === 'increasing' || trend === 'decreasing' || trend === 'stable') {
+        group.trendCounts[trend] += 1;
+      }
     });
 
-    // Apply same scope filtering
-    let scopedPrevData = prevData;
-    if (scopeFilter !== 'all') {
-      const selectedApp = mockApps.find(app => app.id === scopeFilter);
-      if (selectedApp) {
-        scopedPrevData = prevData.filter(pain => 
-          pain.affectedApps.includes(selectedApp.name)
-        );
-      } else {
-        const selectedJourney = mockJourneys.find(journey => journey.id === scopeFilter);
-        if (selectedJourney) {
-          if (selectedJourney.name.includes('Returns')) {
-            scopedPrevData = prevData.filter(pain => 
-              pain.affectedApps.some(app => ['1Returns', 'Order Up', 'Inventory Manager', 'Customer Portal'].includes(app))
-            );
-          } else if (selectedJourney.name.includes('Order') || selectedJourney.name.includes('Fulfillment')) {
-            scopedPrevData = prevData.filter(pain => 
-              pain.affectedApps.some(app => ['Order Up', 'Fulfillment Hub', 'Shipping Manager', 'Inventory Manager'].includes(app))
-            );
-          }
-        }
+    const pains: PainPoint[] = [];
+    grouped.forEach((group) => {
+      const uniqueApps = Array.from(new Set(group.affectedApps));
+      const totalMappings = group.severityCounts.high + group.severityCounts.medium + group.severityCounts.low;
+      group.percentage = totalMappings > 0 ? group.percentageTotal / totalMappings : 0;
+      group.monthsActive =
+        totalMappings > 0 ? Math.max(1, Math.round(group.monthsTotals / totalMappings)) : 0;
+      if (!group.hasMentionsData) {
+        group.totalMentions = group.percentageTotal;
       }
-    }
 
-    return {
-      highSeverity: scopedPrevData.filter(p => p.severity === 'high').length,
-      crossApp: scopedPrevData.filter(p => p.affectedApps.length > 1).length,
-      avgMonths: scopedPrevData.length > 0 
-        ? scopedPrevData.reduce((sum, p) => sum + p.monthsActive, 0) / scopedPrevData.length
-        : 0,
-      longStanding: scopedPrevData.filter(p => p.monthsActive >= 12).length,
+      if (group.severityCounts.high >= group.severityCounts.medium && group.severityCounts.high >= group.severityCounts.low) {
+        group.severity = 'high';
+      } else if (group.severityCounts.medium >= group.severityCounts.low) {
+        group.severity = 'medium';
+      } else {
+        group.severity = 'low';
+      }
+
+      if (group.trendCounts.increasing > group.trendCounts.decreasing && group.trendCounts.increasing > totalMappings / 3) {
+        group.trendDirection = 'increasing';
+      } else if (group.trendCounts.decreasing > group.trendCounts.increasing && group.trendCounts.decreasing > totalMappings / 3) {
+        group.trendDirection = 'decreasing';
+      } else {
+        group.trendDirection = 'stable';
+      }
+
+      const severityMultiplier = group.severity === 'high' ? 3 : group.severity === 'medium' ? 2 : 1;
+      const trendMultiplier =
+        group.trendDirection === 'increasing' ? 1.2 : group.trendDirection === 'decreasing' ? 0.8 : 1;
+      group.impactScore =
+        group.statusWeightedMentions * severityMultiplier * trendMultiplier * Math.max(uniqueApps.length, 1);
+
+      pains.push({
+        ...group,
+        affectedApps: uniqueApps,
+      });
+    });
+
+    pains.sort((a, b) => b.impactScore - a.impactScore);
+    return pains;
+  };
+
+  const buildRecentSeries = (
+    observations: ObservationRow[],
+    normalizedThemes: NormalizedThemeRow[],
+    mappings: ThemeMappingRow[],
+    periods: Array<{ period: string; label: string }>,
+  ) => {
+    const normalizedById = new Map(normalizedThemes.map((theme) => [theme.id, theme]));
+    const mappingByThemeId = new Map(mappings.map((mapping) => [mapping.theme_id, mapping]));
+    const periodIndex = new Map(periods.map((period, index) => [period.period, index]));
+    const series: Record<string, number[]> = {};
+
+    observations.forEach((row) => {
+      if (!row.theme_id || !row.period) return;
+      const index = periodIndex.get(row.period);
+      if (index === undefined) return;
+      const mapping = mappingByThemeId.get(row.theme_id);
+      if (!mapping) return;
+      const normalized = normalizedById.get(mapping.normalized_theme_id);
+      if (!normalized || normalized.is_active === false) return;
+
+      if (!series[normalized.key]) {
+        series[normalized.key] = Array(periods.length).fill(0);
+      }
+      const baseMentions = row.mentions_count ?? row.percent_of_feedback ?? 0;
+      series[normalized.key][index] += baseMentions;
+    });
+
+    return series;
+  };
+
+
+  const computeSummary = (pains: PainPoint[]) => {
+    const highSeverityCount = pains.filter((pain) => pain.severity === 'high').length;
+    const crossAppPainsCount = pains.filter((pain) => pain.affectedApps.length > 1).length;
+    const avgMonthsActive =
+      pains.length > 0 ? pains.reduce((sum, pain) => sum + pain.monthsActive, 0) / pains.length : 0;
+    const chronicCount = pains.filter((pain) => pain.monthsActive >= 6).length;
+      return {
+      highSeverityCount,
+      crossAppPainsCount,
+      avgMonthsActive,
+      chronicCount,
     };
   };
 
-  const prevStats = getPreviousPeriodStats();
+  useEffect(() => {
+    let isMounted = true;
+    const loadPainData = async () => {
+      setIsLoading(true);
+      setLoadError(null);
 
-  // Get time-adjusted pain data
-  const getTimeAdjustedPainData = (): PainPoint[] => {
-    return mockPainData.map(pain => {
-      // Adjust numeric values based on time multiplier
-      const adjustedPercentage = Math.round(pain.percentage * multiplier);
-      const adjustedMentions = Math.round(pain.totalMentions * multiplier);
-      
-      // Adjust monthsActive based on multiplier (higher multiplier = longer duration)
-      const adjustedMonthsActive = Math.max(1, Math.round(pain.monthsActive * (0.7 + multiplier * 0.3)));
-      
-      // Dynamically determine severity based on adjusted percentage
-      let adjustedSeverity: 'high' | 'medium' | 'low';
-      if (adjustedPercentage >= 25) {
-        adjustedSeverity = 'high';
-      } else if (adjustedPercentage >= 15) {
-        adjustedSeverity = 'medium';
-      } else {
-        adjustedSeverity = 'low';
+      const [
+        { data: observations, error: observationsError },
+        { data: normalizedRows },
+        { data: mappingRows },
+      ] = await Promise.all([
+        supabase
+          .from('v_pain_observations_enriched')
+          .select(
+            'period,period_label,sort_order,theme_id,theme_title,theme_type,app_id,app_name,severity,status,months_active,mentions_count,mentions_estimated,percent_of_feedback,trend_direction,trend_percentage,persistence_tag',
+          )
+          .eq('theme_type', 'negative'),
+        supabase.from('normalized_themes').select('id,key,title,description,category,is_active'),
+        supabase.from('theme_mappings').select('theme_id,normalized_theme_id,confidence'),
+      ]);
+
+      if (!isMounted) return;
+
+      if (observationsError) {
+        setLoadError('Unable to load top pains.');
+        setIsLoading(false);
+        return;
       }
-      
-      // Dynamically determine trend based on multiplier changes
-      let adjustedTrend: 'increasing' | 'decreasing' | 'stable';
-      if (multiplier > 1.10) {
-        adjustedTrend = pain.percentage > 20 ? 'increasing' : 'stable';
-      } else if (multiplier < 0.80) {
-        adjustedTrend = pain.percentage > 20 ? 'decreasing' : 'stable';
-      } else {
-        adjustedTrend = pain.trendDirection;
-      }
-      
-      return {
-        ...pain,
-        percentage: adjustedPercentage,
-        totalMentions: adjustedMentions,
-        monthsActive: adjustedMonthsActive,
-        severity: adjustedSeverity,
-        trendDirection: adjustedTrend,
-      };
-    });
-  };
 
-  // Filter data by scope (app or journey)
-  const getScopedPainData = (): PainPoint[] => {
-    const timeAdjustedData = getTimeAdjustedPainData();
-    
-    if (scopeFilter === 'all') {
-      return timeAdjustedData;
-    }
-
-    // Check if it's an app
-    const selectedApp = mockApps.find(app => app.id === scopeFilter);
-    if (selectedApp) {
-      return timeAdjustedData.filter(pain => 
-        pain.affectedApps.includes(selectedApp.name)
+      const pains = buildPainPoints(
+        (observations ?? []) as ObservationRow[],
+        (normalizedRows ?? []) as NormalizedThemeRow[],
+        (mappingRows ?? []) as ThemeMappingRow[],
       );
-    }
 
-    // Check if it's a journey
-    const selectedJourney = mockJourneys.find(journey => journey.id === scopeFilter);
-    if (selectedJourney) {
-      // For journeys, we'll filter by apps involved in that journey
-      // For now, we'll use a simple heuristic based on journey type
-      if (selectedJourney.name.includes('Returns')) {
-        return timeAdjustedData.filter(pain => 
-          pain.affectedApps.some(app => ['1Returns', 'Order Up', 'Inventory Manager', 'Customer Portal'].includes(app))
-        );
-      } else if (selectedJourney.name.includes('Order') || selectedJourney.name.includes('Fulfillment')) {
-        return timeAdjustedData.filter(pain => 
-          pain.affectedApps.some(app => ['Order Up', 'Fulfillment Hub', 'Shipping Manager', 'Inventory Manager'].includes(app))
-        );
-      }
-    }
+      if (!isMounted) return;
 
-    return timeAdjustedData;
+      setPainData(pains);
+      const apps = Array.from(
+        new Set((observations ?? []).map((row) => row.app_name).filter(Boolean)),
+      ) as string[];
+      setAvailableApps(apps.sort((a, b) => a.localeCompare(b)));
+
+      const periodMap = new Map<string, { period: string; label: string; sort_order: number }>();
+      (observations ?? []).forEach((row) => {
+        if (!row.period || row.sort_order === null || row.sort_order === undefined) return;
+        const label = row.period_label ?? row.period;
+        if (!periodMap.has(row.period)) {
+          periodMap.set(row.period, { period: row.period, label, sort_order: row.sort_order });
+        }
+      });
+      const periods = Array.from(periodMap.values())
+        .sort((a, b) => a.sort_order - b.sort_order)
+        .slice(-3);
+      const recent = periods.map((row) => ({ period: row.period, label: row.label }));
+      setRecentPeriods(recent);
+      setDataMonthsCount(periodMap.size);
+      setSeriesByThemeKey(
+        buildRecentSeries(
+          (observations ?? []) as ObservationRow[],
+          (normalizedRows ?? []) as NormalizedThemeRow[],
+          (mappingRows ?? []) as ThemeMappingRow[],
+          recent,
+        ),
+      );
+
+      setIsLoading(false);
+    };
+
+    loadPainData();
+    return () => {
+      isMounted = false;
+    };
+  }, [timePeriod.period, timePeriod.format]);
+
+  const filterByScope = (pains: PainPoint[]) => {
+    if (scopeFilter === 'all') return pains;
+    return pains.filter((pain) => pain.affectedApps.includes(scopeFilter));
   };
 
-  // Sort by severity and percentage
+  const prevLabel = 'previous period';
+
+  // Filter data by scope (app)
+  const getScopedPainData = (): PainPoint[] => {
+    return filterByScope(painData);
+  };
+
+  // Sort by impact score
   const getDisplayedPains = () => {
     let pains = getScopedPainData();
     
     pains.sort((a, b) => {
-      const severityWeight = { high: 3, medium: 2, low: 1 };
-      if (severityWeight[b.severity] !== severityWeight[a.severity]) {
-        return severityWeight[b.severity] - severityWeight[a.severity];
+      if (b.impactScore !== a.impactScore) {
+        return b.impactScore - a.impactScore;
       }
-      return b.percentage - a.percentage;
+      return b.totalMentions - a.totalMentions;
     });
 
     return pains;
   };
 
   const displayedPains = getDisplayedPains();
-
+  const top10Pains = displayedPains.slice(0, 10);
+  const top5Pains = displayedPains.slice(0, 5);
+  const trendValues = top5Pains.flatMap((pain) => seriesByThemeKey[pain.id] ?? []);
+  const maxTrendValue = trendValues.length > 0 ? Math.max(...trendValues) : 1;
   // Calculate summary statistics based on scoped data
   const scopedData = getScopedPainData();
-  const highSeverityCount = scopedData.filter(p => p.severity === 'high').length;
-  const crossAppPainsCount = scopedData.filter(p => p.affectedApps.length > 1).length;
-  const avgMonthsActive = scopedData.length > 0 
-    ? (scopedData.reduce((sum, p) => sum + p.monthsActive, 0) / scopedData.length).toFixed(1)
-    : '0.0';
-  const longStandingCount = scopedData.filter(p => p.monthsActive >= 12).length;
+  const summaryStats = computeSummary(scopedData);
+  const highSeverityCount = summaryStats.highSeverityCount;
+  const crossAppPainsCount = summaryStats.crossAppPainsCount;
+  const avgMonthsActive = summaryStats.avgMonthsActive;
+  const avgMonthsActiveDisplay = avgMonthsActive.toFixed(1);
+  const chronicCount = summaryStats.chronicCount;
 
-  // Generate time-series data for trend chart
-  const generateTrendData = (pain: PainPoint) => {
-    const segments: { label: string; value: number }[] = [];
-    
-    if (timePeriod.format === 'month') {
-      // Show 4 weeks
-      for (let i = 1; i <= 4; i++) {
-        const weekLabel = `W${i}`;
-        // Create variation in data with overall trend
-        const baseValue = pain.totalMentions / 4;
-        let variation = 1.0;
-        
-        if (pain.trendDirection === 'increasing') {
-          variation = 0.7 + (i * 0.15); // Starts lower, increases
-        } else if (pain.trendDirection === 'decreasing') {
-          variation = 1.3 - (i * 0.15); // Starts higher, decreases
-        } else {
-          variation = 0.9 + (Math.random() * 0.2); // Stable with slight variation
-        }
-        
-        segments.push({ label: weekLabel, value: Math.round(baseValue * variation) });
-      }
-    } else if (timePeriod.format === 'quarter') {
-      // Show 3 months
-      const quarterMonths = ['Jan', 'Feb', 'Mar'];
-      const currentQuarter = timePeriod.period.includes('Q1') ? 0 : 
-                            timePeriod.period.includes('Q2') ? 1 : 
-                            timePeriod.period.includes('Q3') ? 2 : 3;
-      const monthNames = [
-        ['Jan', 'Feb', 'Mar'],
-        ['Apr', 'May', 'Jun'],
-        ['Jul', 'Aug', 'Sep'],
-        ['Oct', 'Nov', 'Dec']
-      ][currentQuarter];
-      
-      for (let i = 0; i < 3; i++) {
-        const baseValue = pain.totalMentions / 3;
-        let variation = 1.0;
-        
-        if (pain.trendDirection === 'increasing') {
-          variation = 0.7 + (i * 0.2);
-        } else if (pain.trendDirection === 'decreasing') {
-          variation = 1.3 - (i * 0.2);
-        } else {
-          variation = 0.9 + (Math.random() * 0.2);
-        }
-        
-        segments.push({ label: monthNames[i], value: Math.round(baseValue * variation) });
-      }
-    } else if (timePeriod.format === 'year') {
-      // Show 4 quarters
-      for (let i = 1; i <= 4; i++) {
-        const quarterLabel = `Q${i}`;
-        const baseValue = pain.totalMentions / 4;
-        let variation = 1.0;
-        
-        if (pain.trendDirection === 'increasing') {
-          variation = 0.7 + (i * 0.15);
-        } else if (pain.trendDirection === 'decreasing') {
-          variation = 1.3 - (i * 0.15);
-        } else {
-          variation = 0.9 + (Math.random() * 0.2);
-        }
-        
-        segments.push({ label: quarterLabel, value: Math.round(baseValue * variation) });
-      }
-    }
-    
-    return segments;
-  };
+  const trendLabels = recentPeriods.map((period) => period.label);
+  const lineColors = ['#2563eb', '#10b981', '#f97316', '#a855f7', '#0ea5e9'];
 
   const handlePainClick = (pain: PainPoint) => {
     setSelectedPainForDetail(pain);
@@ -966,10 +990,6 @@ export function TopPains({
     setDetailPanelOpen(false);
     setTimeout(() => setSelectedPainForDetail(null), 300);
   };
-
-  // Get top 10 for ranking and top 5 for trends
-  const top10Pains = displayedPains.slice(0, 10);
-  const top5Pains = displayedPains.slice(0, 5);
 
   // Safety check - don't render if no pains
   const hasData = displayedPains.length > 0;
@@ -985,23 +1005,34 @@ export function TopPains({
         onNavigateTopPains={onNavigateTopPains || (() => {})}
         onNavigateAdmin={onNavigateAdmin}
         onNavigateExport={onNavigateExport}
+        showAdminButton={showAdminButton}
         title="Top Pains"
         subtitle="Recurring pain points across applications"
         showExportButton={true}
       />
 
-      {/* Time Period Selection */}
+      {/* Time Period Selection (disabled for all-time view) */}
       <section className="border-b border-slate-200 bg-slate-50">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-4">
-          <TimeSelector 
-            value={timePeriod} 
-            onChange={onTimePeriodChange}
-            variant="light"
-          />
+          <div className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1 text-sm text-slate-600">
+            <span className="font-semibold text-slate-800">All time</span>
+            <span className="text-slate-500">
+              Top pains across {dataMonthsCount} months of data
+            </span>
+          </div>
         </div>
       </section>
 
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
+        {(isLoading || loadError) && (
+          <Card className="mb-6 border-slate-200 bg-white p-4">
+            {loadError ? (
+              <div className="text-sm text-red-600">{loadError}</div>
+            ) : (
+              <div className="text-sm text-slate-600">Loading top pains…</div>
+            )}
+          </Card>
+        )}
         {/* Scope Filter */}
         <section className="mb-6">
           <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
@@ -1013,20 +1044,14 @@ export function TopPains({
               setCurrentPage(1); // Reset to first page when filter changes
             }}>
               <SelectTrigger id="scope-filter" className="w-full sm:w-80">
-                <SelectValue placeholder="All Apps & Journeys" />
+                <SelectValue placeholder="All Apps" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Apps & Journeys</SelectItem>
+                <SelectItem value="all">All Apps</SelectItem>
                 <div className="px-2 py-1.5 text-xs font-semibold text-slate-500 uppercase">Apps</div>
-                {mockApps.map((app) => (
-                  <SelectItem key={app.id} value={app.id}>
-                    {app.name}
-                  </SelectItem>
-                ))}
-                <div className="px-2 py-1.5 text-xs font-semibold text-slate-500 uppercase border-t border-slate-200 mt-1">Journeys</div>
-                {mockJourneys.map((journey) => (
-                  <SelectItem key={journey.id} value={journey.id}>
-                    {journey.name}
+                {availableApps.map((app) => (
+                  <SelectItem key={app} value={app}>
+                    {app}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -1088,13 +1113,39 @@ export function TopPains({
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
                     <h3 className="font-semibold text-slate-900">Top 10 Pain Points</h3>
-                    <span className="text-sm text-slate-600">by frequency</span>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <button
+                          type="button"
+                          className="inline-flex items-center gap-1 text-sm text-slate-600 hover:text-slate-900"
+                        >
+                          <Info className="size-4" />
+                          Ranking logic
+                        </button>
+                      </TooltipTrigger>
+                      <TooltipContent
+                        side="bottom"
+                        className="w-max max-w-none whitespace-nowrap text-xs leading-relaxed"
+                      >
+                        <div className="whitespace-nowrap">
+                          impact = mentions × status × severity × trend × affected apps
+                        </div>
+                        <div className="whitespace-nowrap">
+                          status: unresolved 1.0, improving 0.85, stabilized 0.6, resolved 0.3
+                        </div>
+                        <div className="whitespace-nowrap">severity: high 3, medium 2, low 1</div>
+                        <div className="whitespace-nowrap">trend: increasing 1.2, stable 1.0, decreasing 0.8</div>
+                      </TooltipContent>
+                    </Tooltip>
                   </div>
                   
                   <div className="space-y-3">
-                    {top10Pains.map((pain, index) => {
+                    {top10Pains.length === 0 ? (
+                      <div className="text-sm text-slate-500">No top pains found for this period.</div>
+                    ) : (
+                      top10Pains.map((pain, index) => {
                       const SeverityIcon = pain.severity === 'high' ? AlertTriangle : pain.severity === 'medium' ? AlertCircle : Info;
-                      const maxMentions = top10Pains[0].totalMentions;
+                        const maxMentions = top10Pains[0]?.totalMentions ?? 1;
                       const barWidth = (pain.totalMentions / maxMentions) * 100;
                       
                       return (
@@ -1111,7 +1162,7 @@ export function TopPains({
                               'text-yellow-600'
                             }`} />
                             <span className="text-sm font-semibold text-slate-900 flex-1 truncate group-hover:text-slate-700">
-                              {markMock(pain.title)}
+                              {pain.title}
                             </span>
                             <span className="text-xs font-semibold text-slate-600 bg-slate-100 px-2 py-0.5 rounded">
                               {pain.affectedApps.length} {pain.affectedApps.length === 1 ? 'app' : 'apps'}
@@ -1128,13 +1179,20 @@ export function TopPains({
                                 style={{ width: `${barWidth}%` }}
                               />
                             </div>
-                            <span className="absolute right-2 top-1 text-sm font-semibold text-slate-900">
-                              {pain.totalMentions}
+                              <span className="absolute right-2 top-1 text-sm text-slate-900">
+                                <span className="font-semibold">{pain.totalMentions}</span>{' '}
+                                <span className="font-normal text-slate-600">mentions</span>
+                                {pain.estimatedMentionsCount > 0 && (
+                                  <span className="ml-1 text-xs font-normal text-slate-500">
+                                    • {pain.estimatedMentionsCount} est.
+                                  </span>
+                                )}
                             </span>
                           </div>
                         </button>
                       );
-                    })}
+                      })
+                    )}
                   </div>
                 </div>
               )}
@@ -1143,17 +1201,21 @@ export function TopPains({
               {(visualizationView === 'both' || visualizationView === 'trends') && (
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
-                    <h3 className="font-semibold text-slate-900">Top 5 Trends Over Time</h3>
-                    <span className="text-sm text-slate-600">within {timePeriod.period}</span>
+                    <h3 className="font-semibold text-slate-900">Top 5 Pains: Last 3 Months</h3>
+                    <span className="text-sm text-slate-600">mentions per month</span>
                   </div>
                   
                   {/* Chart Area */}
                   <div className="relative h-64 border border-slate-200 rounded-lg p-4">
+                    {trendLabels.length === 0 && (
+                      <div className="absolute inset-0 flex items-center justify-center text-sm text-slate-500">
+                        Not enough data to show the last 3 months.
+                      </div>
+                    )}
                     {/* Y-axis labels */}
                     <div className="absolute left-0 top-4 bottom-4 w-12 pr-2 flex flex-col justify-between text-xs text-slate-600 text-right">
                       {[0, 1, 2, 3, 4].reverse().map((i) => {
-                        const maxValue = Math.max(...top5Pains.flatMap(p => generateTrendData(p).map(d => d.value)));
-                        const value = Math.round((maxValue / 4) * i);
+                        const value = Math.round((maxTrendValue / 4) * i);
                         return <span key={i}>{value}</span>;
                       })}
                     </div>
@@ -1176,16 +1238,12 @@ export function TopPains({
                         
                         {/* Lines for each pain point */}
                         {top5Pains.map((pain, painIndex) => {
-                          const trendData = generateTrendData(pain);
-                          const maxValue = Math.max(...top5Pains.flatMap(p => generateTrendData(p).map(d => d.value)));
-                          const SeverityIcon = pain.severity === 'high' ? AlertTriangle : pain.severity === 'medium' ? AlertCircle : Info;
-                          const color = pain.severity === 'high' ? '#dc2626' : 
-                                       pain.severity === 'medium' ? '#ea580c' : 
-                                       '#ca8a04';
-                          
-                          const points = trendData.map((d, i) => {
-                            const x = (i / (trendData.length - 1)) * 400;
-                            const y = 100 - ((d.value / maxValue) * 100);
+                          const values = seriesByThemeKey[pain.id] ?? [];
+                          const color = lineColors[painIndex % lineColors.length];
+                          const count = values.length;
+                          const points = values.map((value, i) => {
+                            const x = count > 1 ? (i / (count - 1)) * 400 : 0;
+                            const y = 100 - ((value / maxTrendValue) * 100);
                             return `${x},${y}`;
                           }).join(' ');
                           
@@ -1203,9 +1261,9 @@ export function TopPains({
                                 onMouseLeave={(e) => e.currentTarget.setAttribute('stroke-width', '2')}
                               />
                               {/* Data points */}
-                              {trendData.map((d, i) => {
-                                const x = (i / (trendData.length - 1)) * 400;
-                                const y = 100 - ((d.value / maxValue) * 100);
+                              {values.map((value, i) => {
+                                const x = values.length > 1 ? (i / (values.length - 1)) * 400 : 0;
+                                const y = 100 - ((value / maxTrendValue) * 100);
                                 return (
                                   <circle
                                     key={i}
@@ -1225,8 +1283,8 @@ export function TopPains({
                       
                       {/* X-axis labels */}
                       <div className="flex justify-between px-1 mt-2 text-xs text-slate-600">
-                        {top5Pains.length > 0 && generateTrendData(top5Pains[0]).map((segment, i) => (
-                          <span key={i} className="text-center">{segment.label}</span>
+                        {trendLabels.map((label, i) => (
+                          <span key={label + i} className="text-center">{label}</span>
                         ))}
                       </div>
                     </div>
@@ -1236,9 +1294,7 @@ export function TopPains({
                   <div className="space-y-1.5">
                     {top5Pains.map((pain, index) => {
                       const SeverityIcon = pain.severity === 'high' ? AlertTriangle : pain.severity === 'medium' ? AlertCircle : Info;
-                      const color = pain.severity === 'high' ? 'bg-red-500' : 
-                                   pain.severity === 'medium' ? 'bg-orange-500' : 
-                                   'bg-yellow-500';
+                      const color = lineColors[index % lineColors.length];
                       
                       return (
                         <button
@@ -1246,13 +1302,13 @@ export function TopPains({
                           onClick={() => handlePainClick(pain)}
                           className="flex items-center gap-2 w-full text-left hover:bg-slate-50 p-1.5 rounded transition-colors"
                         >
-                          <div className={`w-3 h-3 rounded-full ${color} flex-shrink-0`} />
+                          <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: color }} />
                           <SeverityIcon className={`size-3 flex-shrink-0 ${
                             pain.severity === 'high' ? 'text-red-600' : 
                             pain.severity === 'medium' ? 'text-orange-600' : 
                             'text-yellow-600'
                           }`} />
-                          <span className="text-sm text-slate-900 truncate flex-1">{markMock(pain.title)}</span>
+                          <span className="text-sm text-slate-900 truncate flex-1">{pain.title}</span>
                         </button>
                       );
                     })}
@@ -1295,7 +1351,11 @@ export function TopPains({
               
               // Get severity icon
               const SeverityIcon = pain.severity === 'high' ? AlertTriangle : pain.severity === 'medium' ? AlertCircle : Info;
-              const severityLabel = pain.severity === 'high' ? 'High Severity' : pain.severity === 'medium' ? 'Medium Severity' : 'Low Severity';
+              const severityLabel = pain.severity === 'high'
+                ? 'Perceived Severity: High'
+                : pain.severity === 'medium'
+                  ? 'Perceived Severity: Medium'
+                  : 'Perceived Severity: Low';
               const severityColors = pain.severity === 'high' 
                 ? 'bg-red-100 border-red-300 text-red-800' 
                 : pain.severity === 'medium' 
@@ -1313,16 +1373,16 @@ export function TopPains({
                             #{globalIndex + 1}
                           </span>
                         </div>
-                        <h3 className="font-semibold text-slate-900 flex-1">{markMock(pain.title)}</h3>
+                        <h3 className="font-semibold text-slate-900 flex-1">{pain.title}</h3>
                         <span className="px-3 py-1 rounded bg-slate-100 text-slate-900 font-semibold text-sm whitespace-nowrap self-start">
-                          {pain.percentage}% of feedback
+                          {Math.round(pain.percentage)}% of feedback
                         </span>
                       </div>
 
                       <div className="flex flex-wrap items-center gap-2 mb-3">
                         <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-white border border-slate-300 text-slate-700 text-xs font-semibold">
                           <Clock className="size-3" />
-                          Active {pain.monthsActive} months
+                          Duration: {pain.monthsActive} months
                         </span>
 
                         <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded border text-xs font-semibold ${severityColors}`}>
@@ -1353,6 +1413,9 @@ export function TopPains({
 
                         <span className="text-slate-600 text-sm">
                           {pain.totalMentions} mentions
+                          {pain.estimatedMentionsCount > 0 && (
+                            <span className="text-slate-500"> • {pain.estimatedMentionsCount} est.</span>
+                          )}
                         </span>
                       </div>
 
@@ -1388,7 +1451,7 @@ export function TopPains({
                 <div className="flex items-center gap-1 flex-wrap justify-center">
                   {(() => {
                     const totalPages = Math.ceil(displayedPains.length / itemsPerPage);
-                    const pageNumbers = [];
+                    const pageNumbers: React.ReactNode[] = [];
                     const maxVisiblePages = 5;
                     
                     let startPage = Math.max(1, currentPage - Math.floor(maxVisiblePages / 2));
@@ -1490,18 +1553,25 @@ export function TopPains({
                   <AlertTriangle className="size-5 text-red-600 flex-shrink-0" />
                   <div className="flex-1">
                     <div className="text-2xl font-semibold text-slate-900 leading-none mb-0.5">{highSeverityCount}</div>
-                    <h3 className="text-sm text-slate-600 mb-2">High Severity</h3>
+                    <h3 className="text-sm text-slate-600 mb-2">Perceived Severity (High)</h3>
                     {(() => {
-                      const delta = highSeverityCount - prevStats.highSeverity;
+                      if (!prevStats) {
+                        return (
+                          <div className="flex items-center gap-1 text-xs font-semibold text-slate-500">
+                            <span>No prior period</span>
+                          </div>
+                        );
+                      }
+                      const delta = highSeverityCount - prevStats.highSeverityCount;
                       const isWorsening = delta > 0;
                       return delta !== 0 ? (
                         <div className={`flex items-center gap-1 text-xs font-semibold ${isWorsening ? 'text-red-600' : 'text-green-600'}`}>
                           {isWorsening ? <TrendingUp className="size-3" /> : <TrendingDown className="size-3" />}
-                          <span>{Math.abs(delta)} from {previousPeriod.label}</span>
+                          <span>{Math.abs(delta)} from {prevLabel}</span>
                         </div>
                       ) : (
                         <div className="flex items-center gap-1 text-xs font-semibold text-slate-500">
-                          <span>No change from {previousPeriod.label}</span>
+                          <span>No change from {prevLabel}</span>
                         </div>
                       );
                     })()}
@@ -1516,16 +1586,23 @@ export function TopPains({
                     <div className="text-2xl font-semibold text-slate-900 leading-none mb-0.5">{crossAppPainsCount}</div>
                     <h3 className="text-sm text-slate-600 mb-2">Cross-App Issues</h3>
                     {(() => {
-                      const delta = crossAppPainsCount - prevStats.crossApp;
+                      if (!prevStats) {
+                        return (
+                          <div className="flex items-center gap-1 text-xs font-semibold text-slate-500">
+                            <span>No prior period</span>
+                          </div>
+                        );
+                      }
+                      const delta = crossAppPainsCount - prevStats.crossAppPainsCount;
                       const isWorsening = delta > 0;
                       return delta !== 0 ? (
                         <div className={`flex items-center gap-1 text-xs font-semibold ${isWorsening ? 'text-red-600' : 'text-green-600'}`}>
                           {isWorsening ? <TrendingUp className="size-3" /> : <TrendingDown className="size-3" />}
-                          <span>{Math.abs(delta)} from {previousPeriod.label}</span>
+                          <span>{Math.abs(delta)} from {prevLabel}</span>
                         </div>
                       ) : (
                         <div className="flex items-center gap-1 text-xs font-semibold text-slate-500">
-                          <span>No change from {previousPeriod.label}</span>
+                          <span>No change from {prevLabel}</span>
                         </div>
                       );
                     })()}
@@ -1537,20 +1614,26 @@ export function TopPains({
                 <div className="flex items-start gap-3">
                   <Clock className="size-5 text-purple-600 flex-shrink-0" />
                   <div className="flex-1">
-                    <div className="text-2xl font-semibold text-slate-900 leading-none mb-0.5">{avgMonthsActive}</div>
+                    <div className="text-2xl font-semibold text-slate-900 leading-none mb-0.5">{avgMonthsActiveDisplay}</div>
                     <h3 className="text-sm text-slate-600 mb-2">Avg Duration (mo)</h3>
                     {(() => {
-                      const currentAvg = parseFloat(avgMonthsActive);
-                      const delta = currentAvg - prevStats.avgMonths;
+                      if (!prevStats) {
+                        return (
+                          <div className="flex items-center gap-1 text-xs font-semibold text-slate-500">
+                            <span>No prior period</span>
+                          </div>
+                        );
+                      }
+                      const delta = avgMonthsActive - prevStats.avgMonthsActive;
                       const isWorsening = delta > 0;
                       return Math.abs(delta) >= 0.1 ? (
                         <div className={`flex items-center gap-1 text-xs font-semibold ${isWorsening ? 'text-red-600' : 'text-green-600'}`}>
                           {isWorsening ? <TrendingUp className="size-3" /> : <TrendingDown className="size-3" />}
-                          <span>{Math.abs(delta).toFixed(1)}mo from {previousPeriod.label}</span>
+                          <span>{Math.abs(delta).toFixed(1)}mo from {prevLabel}</span>
                         </div>
                       ) : (
                         <div className="flex items-center gap-1 text-xs font-semibold text-slate-500">
-                          <span>No change from {previousPeriod.label}</span>
+                          <span>No change from {prevLabel}</span>
                         </div>
                       );
                     })()}
@@ -1562,19 +1645,26 @@ export function TopPains({
                 <div className="flex items-start gap-3">
                   <AlertCircle className="size-5 text-orange-600 flex-shrink-0" />
                   <div className="flex-1">
-                    <div className="text-2xl font-semibold text-slate-900 leading-none mb-0.5">{longStandingCount}</div>
+                    <div className="text-2xl font-semibold text-slate-900 leading-none mb-0.5">{chronicCount}</div>
                     <h3 className="text-sm text-slate-600 mb-2">Chronic Issues</h3>
                     {(() => {
-                      const delta = longStandingCount - prevStats.longStanding;
+                      if (!prevStats) {
+                        return (
+                          <div className="flex items-center gap-1 text-xs font-semibold text-slate-500">
+                            <span>No prior period</span>
+                          </div>
+                        );
+                      }
+                      const delta = chronicCount - prevStats.chronicCount;
                       const isWorsening = delta > 0;
                       return delta !== 0 ? (
                         <div className={`flex items-center gap-1 text-xs font-semibold ${isWorsening ? 'text-red-600' : 'text-green-600'}`}>
                           {isWorsening ? <TrendingUp className="size-3" /> : <TrendingDown className="size-3" />}
-                          <span>{Math.abs(delta)} from {previousPeriod.label}</span>
+                          <span>{Math.abs(delta)} from {prevLabel}</span>
                         </div>
                       ) : (
                         <div className="flex items-center gap-1 text-xs font-semibold text-slate-500">
-                          <span>No change from {previousPeriod.label}</span>
+                          <span>No change from {prevLabel}</span>
                         </div>
                       );
                     })()}
@@ -1616,7 +1706,7 @@ export function TopPains({
             <div className="p-6 space-y-6">
               {/* Key Metrics */}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div className="bg-slate-50 rounded-lg p-4 border border-slate-200">
+                <div className="rounded-xl bg-white p-5 border border-slate-200 shadow-sm">
                   <div className="text-sm text-slate-600 mb-1">Severity</div>
                   <div className={`inline-flex items-center gap-1.5 px-2 py-1 rounded border text-sm font-semibold ${
                     selectedPainForDetail.severity === 'high' ? 'bg-red-100 border-red-300 text-red-800' :
@@ -1630,19 +1720,26 @@ export function TopPains({
                   </div>
                 </div>
 
-                <div className="bg-slate-50 rounded-lg p-4 border border-slate-200">
+                <div className="rounded-xl bg-white p-5 border border-slate-200 shadow-sm">
                   <div className="text-sm text-slate-600 mb-1">Total Mentions</div>
                   <div className="text-2xl font-semibold text-slate-900">{selectedPainForDetail.totalMentions}</div>
-                  <div className="text-xs text-slate-600 mt-0.5">{selectedPainForDetail.percentage}% of feedback</div>
+                  <div className="text-xs text-slate-600 mt-0.5">
+                    {Math.round(selectedPainForDetail.percentage)}% of feedback
+                  </div>
+                  {selectedPainForDetail.estimatedMentionsCount > 0 && (
+                    <div className="text-xs text-slate-500 mt-0.5">
+                      Includes {selectedPainForDetail.estimatedMentionsCount} estimated
+                    </div>
+                  )}
                 </div>
 
-                <div className="bg-slate-50 rounded-lg p-4 border border-slate-200">
+                <div className="rounded-xl bg-white p-5 border border-slate-200 shadow-sm">
                   <div className="text-sm text-slate-600 mb-1">Duration</div>
                   <div className="text-2xl font-semibold text-slate-900">{selectedPainForDetail.monthsActive}</div>
                   <div className="text-xs text-slate-600 mt-0.5">months active</div>
                 </div>
 
-                <div className="bg-slate-50 rounded-lg p-4 border border-slate-200">
+                <div className="rounded-xl bg-white p-5 border border-slate-200 shadow-sm">
                   <div className="text-sm text-slate-600 mb-1">Affected Apps</div>
                   <div className="text-2xl font-semibold text-slate-900">{selectedPainForDetail.affectedApps.length}</div>
                   <div className="text-xs text-slate-600 mt-0.5">{selectedPainForDetail.affectedApps.length === 1 ? 'application' : 'applications'}</div>
@@ -1651,13 +1748,16 @@ export function TopPains({
 
               {/* Trend Chart */}
               <div>
-                <h3 className="font-semibold text-slate-900 mb-3">Frequency Over Time</h3>
+                <h3 className="font-semibold text-slate-900 mb-3">Mentions Over Time</h3>
                 <div className="border border-slate-200 rounded-lg p-4">
-                  <div className="relative h-48">
+                    <div className="relative h-48">
                     {/* Y-axis labels */}
                     <div className="absolute left-0 top-0 bottom-8 w-12 pr-2 flex flex-col justify-between text-xs text-slate-600 text-right">
                       {[0, 1, 2, 3, 4].reverse().map((i) => {
-                        const trendData = generateTrendData(selectedPainForDetail);
+                        const trendData = (seriesByThemeKey[selectedPainForDetail.id] ?? []).map((value, index) => ({
+                          label: trendLabels[index] ?? '',
+                          value,
+                        }));
                         const maxValue = Math.max(...trendData.map(d => d.value));
                         const value = Math.round((maxValue / 4) * i);
                         return <span key={i}>{value}</span>;
@@ -1666,15 +1766,15 @@ export function TopPains({
                     
                     {/* Chart */}
                     <div className="ml-14 h-full pb-8 pt-3">
-                      <svg className="w-full h-full" viewBox="0 0 400 110" preserveAspectRatio="xMidYMid meet">
+                      <svg className="w-full h-full" viewBox="0 0 400 130" preserveAspectRatio="xMidYMid meet">
                         {/* Grid lines */}
                         {[0, 1, 2, 3, 4].map((i) => (
                           <line
                             key={i}
                             x1="0"
-                            y1={10 + (i / 4) * 100}
+                            y1={18 + (i / 4) * 100}
                             x2="400"
-                            y2={10 + (i / 4) * 100}
+                            y2={18 + (i / 4) * 100}
                             stroke="#e2e8f0"
                             strokeWidth="0.5"
                           />
@@ -1682,7 +1782,10 @@ export function TopPains({
                         
                         {/* Line */}
                         {(() => {
-                          const trendData = generateTrendData(selectedPainForDetail);
+                          const trendData = (seriesByThemeKey[selectedPainForDetail.id] ?? []).map((value, index) => ({
+                            label: trendLabels[index] ?? '',
+                            value,
+                          }));
                           const maxValue = Math.max(...trendData.map(d => d.value));
                           const color = selectedPainForDetail.severity === 'high' ? '#dc2626' : 
                                        selectedPainForDetail.severity === 'medium' ? '#ea580c' : 
@@ -1690,7 +1793,7 @@ export function TopPains({
                           
                           const points = trendData.map((d, i) => {
                             const x = (i / (trendData.length - 1)) * 400;
-                            const y = 10 + (100 - ((d.value / maxValue) * 100));
+                            const y = 18 + (100 - ((d.value / maxValue) * 100));
                             return `${x},${y}`;
                           }).join(' ');
                           
@@ -1705,7 +1808,7 @@ export function TopPains({
                               {/* Data points */}
                               {trendData.map((d, i) => {
                                 const x = (i / (trendData.length - 1)) * 400;
-                                const y = 10 + (100 - ((d.value / maxValue) * 100));
+                                const y = 18 + (100 - ((d.value / maxValue) * 100));
                                 return (
                                   <g key={i}>
                                     <circle
@@ -1716,12 +1819,13 @@ export function TopPains({
                                     />
                                     <text
                                       x={x}
-                                      y={y - 8}
-                                      textAnchor="middle"
-                                      className="text-xs font-semibold fill-slate-700"
-                                    >
-                                      {d.value}
-                                    </text>
+                                      y={Math.max(12, y - 8)}
+                                    textAnchor={i === 0 ? 'start' : i === trendData.length - 1 ? 'end' : 'middle'}
+                                    dx={i === 0 ? 4 : i === trendData.length - 1 ? -4 : 0}
+                                    className="text-xs font-semibold fill-slate-700"
+                                  >
+                                    {d.value}
+                                  </text>
                                   </g>
                                 );
                               })}
@@ -1732,7 +1836,10 @@ export function TopPains({
                       
                       {/* X-axis labels */}
                       <div className="flex justify-between px-1 mt-2 text-xs text-slate-600">
-                        {generateTrendData(selectedPainForDetail).map((segment, i) => (
+                        {(seriesByThemeKey[selectedPainForDetail.id] ?? []).map((value, index) => ({
+                          label: trendLabels[index] ?? '',
+                          value,
+                        })).map((segment, i) => (
                           <span key={i} className="text-center">{segment.label}</span>
                         ))}
                       </div>
@@ -1775,7 +1882,7 @@ export function TopPains({
                 <div className="flex flex-wrap gap-2">
                   {selectedPainForDetail.affectedApps.map((app, index) => (
                     <div key={index} className="inline-flex items-center px-2.5 py-1.5 bg-slate-50 rounded border border-slate-200">
-                      <span className="text-slate-900 text-sm">{markMock(app)}</span>
+                      <span className="text-slate-900 text-sm">{app}</span>
                     </div>
                   ))}
                 </div>
