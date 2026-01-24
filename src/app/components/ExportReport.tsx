@@ -697,9 +697,9 @@ function AppDetailPage({
             points={dataPoints
               .map((d, i) => {
                 if (d.overallScore === null) return null;
-                const x = chartPadding.left + i * xStep;
-                const y = yScale(d.overallScore);
-                return `${x},${y}`;
+              const x = chartPadding.left + i * xStep;
+              const y = yScale(d.overallScore);
+              return `${x},${y}`;
               })
               .filter(Boolean)
               .join(' ')}
@@ -810,9 +810,9 @@ function AppDetailPage({
               .map((d, i) => {
                 const value = d[dataKey];
                 if (value === null) return null;
-                const x = chartPadding.left + i * xStep;
+              const x = chartPadding.left + i * xStep;
                 const y = yScale(value);
-                return `${x},${y}`;
+              return `${x},${y}`;
               })
               .filter(Boolean)
               .join(' ')}
@@ -1746,18 +1746,18 @@ export function ExportReport({
         }
       `}</style>
       <div className="export-app-header">
-        <NavigationHeader
-          currentView="other"
-          onNavigateHome={onNavigateHome || onNavigateBack}
-          onNavigateAllApps={onNavigateAllApps || onNavigateBack}
-          onNavigateKeyJourneys={onNavigateKeyJourneys || onNavigateBack}
-          onNavigateTopPains={onNavigateTopPains || onNavigateBack}
-          onNavigateAdmin={onNavigateAdmin}
+      <NavigationHeader
+        currentView="other"
+        onNavigateHome={onNavigateHome || onNavigateBack}
+        onNavigateAllApps={onNavigateAllApps || onNavigateBack}
+        onNavigateKeyJourneys={onNavigateKeyJourneys || onNavigateBack}
+        onNavigateTopPains={onNavigateTopPains || onNavigateBack}
+        onNavigateAdmin={onNavigateAdmin}
           showAdminButton={showAdminButton}
-          title="Export Report"
-          subtitle="Configure and download custom reports"
-          showExportButton={false}
-        />
+        title="Export Report"
+        subtitle="Configure and download custom reports"
+        showExportButton={false}
+      />
       </div>
 
       <div className="flex h-[calc(100vh-80px)] flex-col lg:flex-row">
@@ -1971,8 +1971,13 @@ export function ExportReport({
 
             {/* Export Button */}
             <Button
+              type="button"
               onClick={handleExport}
-              className="w-full bg-orange-600 hover:bg-orange-700 text-white"
+              onTouchEnd={(event) => {
+                event.preventDefault();
+                handleExport();
+              }}
+              className="w-full bg-orange-600 hover:bg-orange-700 text-white select-none"
             >
               <Download size={16} className="mr-2" />
               Export {config.exportFormat.toUpperCase()}
@@ -1994,18 +1999,18 @@ export function ExportReport({
             {/* Cover Page */}
             <div className="export-page bg-white shadow-lg rounded-sm overflow-hidden">
               <div className="export-slide">
-                <CoverPage />
+              <CoverPage />
               </div>
             </div>
 
             {/* Title Page */}
             <div className="export-page bg-white shadow-lg rounded-sm overflow-hidden">
               <div className="export-slide">
-                <TitlePage 
+              <TitlePage 
                   title={`${reportPeriodLabel}\n${config.reportTitle.replace(/\\n/g, '\n')}`}
-                  author={config.reportAuthor}
-                  date={formattedDate}
-                />
+                author={config.reportAuthor}
+                date={formattedDate}
+              />
               </div>
             </div>
 
@@ -2016,13 +2021,13 @@ export function ExportReport({
                 {pendoApps.length > 0 && (
                   <div className="export-page bg-white shadow-lg rounded-sm overflow-hidden">
                     <div className="export-slide">
-                      <PortfolioTablePage
-                        title="Store Systems"
+                    <PortfolioTablePage
+                      title="Store Systems"
                         month={reportPeriodShortLabel}
-                        apps={sortApps(pendoApps)}
-                        metricsSystem="Pendo"
+                      apps={sortApps(pendoApps)}
+                      metricsSystem="Pendo"
                         highlights={reportHighlights}
-                      />
+                    />
                     </div>
                   </div>
                 )}
@@ -2031,13 +2036,13 @@ export function ExportReport({
                 {medalliaApps.length > 0 && (
                   <div className="export-page bg-white shadow-lg rounded-sm overflow-hidden">
                     <div className="export-slide">
-                      <PortfolioTablePage
-                        title="Store Systems"
+                    <PortfolioTablePage
+                      title="Store Systems"
                         month={reportPeriodShortLabel}
-                        apps={sortApps(medalliaApps)}
-                        metricsSystem="Medallia"
+                      apps={sortApps(medalliaApps)}
+                      metricsSystem="Medallia"
                         highlights={reportHighlights}
-                      />
+                    />
                     </div>
                   </div>
                 )}
@@ -2050,7 +2055,7 @@ export function ExportReport({
                       <>
                         <div className="export-page bg-white shadow-lg rounded-sm overflow-hidden">
                           <div className="export-slide">
-                            <DividerPage title="Score Drivers" subtitle="Captured w/ Pendo" />
+                          <DividerPage title="Score Drivers" subtitle="Captured w/ Pendo" />
                           </div>
                         </div>
                         
@@ -2077,7 +2082,7 @@ export function ExportReport({
                       <>
                         <div className="export-page bg-white shadow-lg rounded-sm overflow-hidden">
                           <div className="export-slide">
-                            <DividerPage title="Score Drivers" subtitle="Captured w/ Medallia" />
+                          <DividerPage title="Score Drivers" subtitle="Captured w/ Medallia" />
                           </div>
                         </div>
                         
