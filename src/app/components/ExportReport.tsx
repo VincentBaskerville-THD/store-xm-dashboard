@@ -1649,13 +1649,55 @@ export function ExportReport({
                 <meta name="viewport" content="width=device-width, initial-scale=1" />
                 <base href="${window.location.origin}/" />
                 ${styleContent}
+                <style>
+                  .export-print-toolbar {
+                    position: sticky;
+                    top: 0;
+                    z-index: 9999;
+                    background: white;
+                    border-bottom: 1px solid #e5e7eb;
+                    padding: 12px 16px;
+                    display: flex;
+                    align-items: center;
+                    gap: 12px;
+                    font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+                  }
+                  .export-print-toolbar button {
+                    background: #f96302;
+                    color: white;
+                    border: none;
+                    border-radius: 8px;
+                    padding: 10px 14px;
+                    font-weight: 600;
+                  }
+                  .export-print-toolbar span {
+                    color: #4b5563;
+                    font-size: 12px;
+                  }
+                  @media print {
+                    .export-print-toolbar {
+                      display: none !important;
+                    }
+                  }
+                </style>
               </head>
               <body>
+                <div class="export-print-toolbar">
+                  <button type="button" id="exportPrintBtn">Print / Save PDF</button>
+                  <span>If the print dialog doesn’t open, tap this button.</span>
+                </div>
                 <div class="export-preview-panel">${previewHtml}</div>
                 <script>
                   window.onload = function () {
                     window.focus();
                     window.print();
+                    var btn = document.getElementById('exportPrintBtn');
+                    if (btn) {
+                      btn.addEventListener('click', function () {
+                        window.focus();
+                        window.print();
+                      });
+                    }
                   };
                 </script>
               </body>
