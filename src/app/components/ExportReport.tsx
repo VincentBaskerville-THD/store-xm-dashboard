@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { FileDown, ChevronDown, ChevronUp, Download, Eye, X } from 'lucide-react';
+import { FileDown, ChevronDown, ChevronUp, Download } from 'lucide-react';
 import { Button } from './ui/button';
 import { Card } from './ui/card';
 import { NavigationHeader } from './NavigationHeader';
@@ -1094,7 +1094,7 @@ export function ExportReport({
   const [monthLabelToCode, setMonthLabelToCode] = useState<Record<string, string>>({});
   const [hasInitializedMonth, setHasInitializedMonth] = useState(false);
 
-  const [showAdvancedSettings, setShowAdvancedSettings] = useState(false);
+  const [showAdvancedSettings, setShowAdvancedSettings] = useState(true);
   const [isMobile, setIsMobile] = useState(false);
   const [showMobilePreview, setShowMobilePreview] = useState(false);
 
@@ -1175,100 +1175,107 @@ export function ExportReport({
       setIsMetricsLoading(true);
       setMetricsError(null);
 
-      const viewName = 'v_app_metrics_trends';
-      const selectedLabel = config.scoresConfig.selectedMonth;
-      const selectedPeriodCode = selectedLabel ? monthLabelToCode[selectedLabel] : undefined;
+      try {
+        const viewName = 'v_app_metrics_trends';
+        const selectedLabel = config.scoresConfig.selectedMonth;
+        const selectedPeriodCode = selectedLabel ? monthLabelToCode[selectedLabel] : undefined;
 
-      if (!selectedLabel || !selectedPeriodCode) {
+        if (!selectedLabel || !selectedPeriodCode) {
+          setExportApps([]);
+          setMetricsPeriodLabel(null);
+          return;
+        }
+
+        const baseSelect =
+          'app_id, app_name, period, period_label, sort_order, overall_score, mom_pct_change, qoq_pct_change, yoy_pct_change, ease_of_use_avg, usefulness_avg, ease_of_use_topbox_pct, usefulness_topbox_pct, response_count, resolved_metrics_system';
+
+        const buildQuery = (field: 'period' | 'period_label', value: string) =>
+          supabase.from(viewName).select(baseSelect).eq(field, value).order('app_name', { ascending: true });
+
+        let { data: rows, error: rowsError } = await buildQuery('period', selectedPeriodCode);
+
+        if (!rowsError && (!rows || rows.length === 0)) {
+          const retry = await buildQuery('period_label', selectedLabel);
+          if (!retry.error && retry.data && retry.data.length > 0) {
+            rows = retry.data;
+          } else if (retry.error && !rowsError) {
+            rowsError = retry.error;
+          }
+        }
+
+        if (!isMounted) return;
+
+        if (rowsError) {
+          setMetricsError(rowsError.message ?? 'Failed to load app metrics.');
+          setExportApps([]);
+          setMetricsPeriodLabel(null);
+          return;
+        }
+
+        const appIds = Array.from(new Set((rows ?? []).map((row: AppMetricsRow) => row.app_id)));
+        let appFlags: Record<string, { isKTLO: boolean; noUX: boolean }> = {};
+
+        if (appIds.length > 0) {
+          const { data: appFlagRows, error: appFlagsError } = await supabase
+            .from('apps')
+            .select('id,is_ktlo,no_ux')
+            .in('id', appIds);
+
+          if (appFlagsError) {
+            console.warn('Failed to load app flags:', appFlagsError.message);
+          } else if (Array.isArray(appFlagRows)) {
+            appFlags = appFlagRows.reduce((acc, row) => {
+              acc[row.id] = {
+                isKTLO: Boolean(row.is_ktlo),
+                noUX: Boolean(row.no_ux),
+              };
+              return acc;
+            }, {} as Record<string, { isKTLO: boolean; noUX: boolean }>);
+          }
+        }
+
+        const mappedApps = (rows ?? []).map((row: AppMetricsRow) => {
+          const changeValue = Number(row.mom_pct_change ?? 0);
+          const flags = appFlags[row.app_id];
+
+          return {
+            id: row.app_id,
+            name: row.app_name ?? row.app_id ?? 'Unknown',
+            overallScore: row.overall_score ?? 0,
+            scoreMoM: changeValue,
+            easeOfUse: Number(row.ease_of_use_avg ?? 0),
+            usefulness: Number(row.usefulness_avg ?? 0),
+            responses: row.response_count ?? 0,
+            trend: getTrendFromChange(changeValue),
+            metricsSystem: normalizeMetricsSystem(row.resolved_metrics_system),
+            isKTLO: flags?.isKTLO ?? false,
+            noUX: flags?.noUX ?? false,
+          };
+        });
+
+        const topBoxMap: Record<string, { ease: number | null; usefulness: number | null }> = {};
+        (rows ?? []).forEach((row: AppMetricsRow) => {
+          topBoxMap[row.app_id] = {
+            ease: row.ease_of_use_topbox_pct ?? null,
+            usefulness: row.usefulness_topbox_pct ?? null,
+          };
+        });
+
+        setExportApps(mappedApps);
+        setAppTopBox(topBoxMap);
+        setMetricsPeriodLabel(selectedLabel);
+
+        if (!hasCustomAppSelection) {
+          updateScoresConfig({ selectedApps: mappedApps.map(app => app.id) });
+        }
+      } catch (error) {
+        if (!isMounted) return;
+        setMetricsError('Failed to load app metrics.');
         setExportApps([]);
         setMetricsPeriodLabel(null);
+      } finally {
+        if (!isMounted) return;
         setIsMetricsLoading(false);
-        return;
-      }
-
-      const baseSelect =
-        'app_id, app_name, period, period_label, sort_order, overall_score, mom_pct_change, qoq_pct_change, yoy_pct_change, ease_of_use_avg, usefulness_avg, ease_of_use_topbox_pct, usefulness_topbox_pct, response_count, resolved_metrics_system';
-
-      const buildQuery = (field: 'period' | 'period_label', value: string) =>
-        supabase.from(viewName).select(baseSelect).eq(field, value).order('app_name', { ascending: true });
-
-      let { data: rows, error: rowsError } = await buildQuery('period', selectedPeriodCode);
-
-      if (!rowsError && (!rows || rows.length === 0)) {
-        const retry = await buildQuery('period_label', selectedLabel);
-        if (!retry.error && retry.data && retry.data.length > 0) {
-          rows = retry.data;
-        } else if (retry.error && !rowsError) {
-          rowsError = retry.error;
-        }
-      }
-
-      if (!isMounted) return;
-
-      if (rowsError) {
-        setMetricsError(rowsError.message ?? 'Failed to load app metrics.');
-        setExportApps([]);
-        setMetricsPeriodLabel(null);
-        setIsMetricsLoading(false);
-        return;
-      }
-
-      const appIds = Array.from(new Set((rows ?? []).map((row: AppMetricsRow) => row.app_id)));
-      let appFlags: Record<string, { isKTLO: boolean; noUX: boolean }> = {};
-
-      if (appIds.length > 0) {
-        const { data: appFlagRows, error: appFlagsError } = await supabase
-          .from('apps')
-          .select('id,is_ktlo,no_ux')
-          .in('id', appIds);
-
-        if (appFlagsError) {
-          console.warn('Failed to load app flags:', appFlagsError.message);
-        } else if (Array.isArray(appFlagRows)) {
-          appFlags = appFlagRows.reduce((acc, row) => {
-            acc[row.id] = {
-              isKTLO: Boolean(row.is_ktlo),
-              noUX: Boolean(row.no_ux),
-            };
-            return acc;
-          }, {} as Record<string, { isKTLO: boolean; noUX: boolean }>);
-        }
-      }
-
-      const mappedApps = (rows ?? []).map((row: AppMetricsRow) => {
-        const changeValue = Number(row.mom_pct_change ?? 0);
-        const flags = appFlags[row.app_id];
-
-        return {
-          id: row.app_id,
-          name: row.app_name ?? row.app_id ?? 'Unknown',
-          overallScore: row.overall_score ?? 0,
-          scoreMoM: changeValue,
-          easeOfUse: Number(row.ease_of_use_avg ?? 0),
-          usefulness: Number(row.usefulness_avg ?? 0),
-          responses: row.response_count ?? 0,
-          trend: getTrendFromChange(changeValue),
-          metricsSystem: normalizeMetricsSystem(row.resolved_metrics_system),
-          isKTLO: flags?.isKTLO ?? false,
-          noUX: flags?.noUX ?? false,
-        };
-      });
-
-      const topBoxMap: Record<string, { ease: number | null; usefulness: number | null }> = {};
-      (rows ?? []).forEach((row: AppMetricsRow) => {
-        topBoxMap[row.app_id] = {
-          ease: row.ease_of_use_topbox_pct ?? null,
-          usefulness: row.usefulness_topbox_pct ?? null,
-        };
-      });
-
-      setExportApps(mappedApps);
-      setAppTopBox(topBoxMap);
-      setMetricsPeriodLabel(selectedLabel);
-      setIsMetricsLoading(false);
-
-      if (!hasCustomAppSelection) {
-        updateScoresConfig({ selectedApps: mappedApps.map(app => app.id) });
       }
     };
 
@@ -1752,18 +1759,6 @@ export function ExportReport({
           showExportButton={false}
         />
       </div>
-
-      {isMobile && (
-        <div className="export-mobile-toggle fixed bottom-4 right-4 z-50">
-          <Button
-            onClick={() => setShowMobilePreview((prev) => !prev)}
-            className="bg-orange-600 hover:bg-orange-700 text-white shadow-lg rounded-full h-14 w-14 p-0"
-            aria-label={showMobilePreview ? 'Hide preview' : 'Show preview'}
-          >
-            {showMobilePreview ? <X size={24} /> : <Eye size={24} />}
-          </Button>
-        </div>
-      )}
 
       <div className="flex h-[calc(100vh-80px)] flex-col lg:flex-row">
         {/* Left Configuration Panel */}
