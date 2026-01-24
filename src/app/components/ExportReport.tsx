@@ -1628,7 +1628,10 @@ export function ExportReport({
 
   const handleExport = () => {
     if (config.exportFormat === 'pdf') {
-      if (isMobile) {
+      const mobile =
+        typeof window !== 'undefined' && window.matchMedia('(max-width: 1024px)').matches;
+
+      if (mobile) {
         const previewHtml = previewPanelRef.current?.innerHTML;
         const styleContent = Array.from(
           document.querySelectorAll('style, link[rel="stylesheet"]'),
@@ -1659,6 +1662,14 @@ export function ExportReport({
             </html>
           `);
           printWindow.document.close();
+          window.setTimeout(() => {
+            try {
+              printWindow.focus();
+              printWindow.print();
+            } catch (error) {
+              // ignore
+            }
+          }, 500);
           return;
         }
       }
