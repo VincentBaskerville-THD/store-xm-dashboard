@@ -1628,9 +1628,42 @@ export function ExportReport({
 
   const handleExport = () => {
     if (config.exportFormat === 'pdf') {
-      window.setTimeout(() => {
-        window.print();
-      }, 0);
+      if (isMobile) {
+        const previewHtml = previewPanelRef.current?.innerHTML;
+        const styleContent = Array.from(
+          document.querySelectorAll('style, link[rel="stylesheet"]'),
+        )
+          .map((node) => node.outerHTML)
+          .join('\n');
+        const printWindow = window.open('', '_blank');
+
+        if (printWindow && previewHtml) {
+          printWindow.document.open();
+          printWindow.document.write(`
+            <html>
+              <head>
+                <title>Export Report</title>
+                <meta name="viewport" content="width=device-width, initial-scale=1" />
+                <base href="${window.location.origin}/" />
+                ${styleContent}
+              </head>
+              <body>
+                <div class="export-preview-panel">${previewHtml}</div>
+                <script>
+                  window.onload = function () {
+                    window.focus();
+                    window.print();
+                  };
+                </script>
+              </body>
+            </html>
+          `);
+          printWindow.document.close();
+          return;
+        }
+      }
+
+      window.print();
       return;
     }
 
@@ -1671,7 +1704,7 @@ export function ExportReport({
 
   return (
     <div className="min-h-screen bg-slate-50">
-      <style>{`
+      <style data-export-report>{`
         @media screen {
           .export-preview-panel .export-page {
             width: 1100px;
