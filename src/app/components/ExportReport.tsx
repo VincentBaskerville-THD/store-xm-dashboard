@@ -1628,7 +1628,9 @@ export function ExportReport({
 
   const handleExport = () => {
     if (config.exportFormat === 'pdf') {
-      window.print();
+      window.setTimeout(() => {
+        window.print();
+      }, 0);
       return;
     }
 
