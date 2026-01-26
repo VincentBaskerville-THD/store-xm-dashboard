@@ -12,8 +12,10 @@ interface NavigationHeaderProps {
   onNavigateTopPains: () => void;
   onNavigateAdmin?: () => void;
   onNavigateExport?: () => void;
-  title: string;
+  title: React.ReactNode;
   subtitle?: string;
+  badges?: React.ReactNode;
+  description?: React.ReactNode;
   lastUpdated?: string;
   showExportButton?: boolean;
   showAdminButton?: boolean;
@@ -29,6 +31,8 @@ export function NavigationHeader({
   onNavigateExport,
   title,
   subtitle,
+  badges,
+  description,
   lastUpdated,
   showExportButton = true,
   showAdminButton = true,
@@ -74,6 +78,8 @@ export function NavigationHeader({
           <div className="flex-1">
             <h1 className="font-semibold">{title}</h1>
             {subtitle && <p className="text-slate-300 mt-1 text-sm">{subtitle}</p>}
+            {badges && <div className="mt-3 flex flex-wrap items-center gap-2">{badges}</div>}
+            {description && <div className="text-slate-200 mt-2 text-sm">{description}</div>}
           </div>
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full lg:w-auto">
             {/* Optional actions (export/admin) depend on the current page context. */}

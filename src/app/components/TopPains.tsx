@@ -1,7 +1,7 @@
 // Top pains dashboard: aggregates feedback themes into prioritized pain points.
 // Mixes live Supabase data (when available) with a mock fallback dataset.
 import React, { useEffect, useMemo, useState } from 'react';
-import { ArrowLeft, FileDown, AlertTriangle, TrendingUp, TrendingDown, AlertCircle, Info, Link2, Clock, X, BarChart3, LineChart, Construction } from 'lucide-react';
+import { AlertTriangle, TrendingUp, TrendingDown, AlertCircle, Info, Link2, Clock, BarChart3, LineChart, Construction, ChevronRight } from 'lucide-react';
 import { Button } from './ui/button';
 import { Card } from './ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
@@ -19,6 +19,7 @@ interface TopPainsProps {
   onNavigateAllApps?: () => void;
   onNavigateKeyJourneys?: () => void;
   onNavigateTopPains?: () => void;
+  onNavigateTopPainDetail?: (painId: string, scopeLabel?: string, defaultAppName?: string) => void;
   onNavigateAdmin?: () => void;
   onNavigateExport?: () => void;
   isFeatureEnabled?: boolean;
@@ -75,556 +76,6 @@ type ObservationRow = {
   persistence_tag: string | null;
 };
 
-// Mock pain data aggregated from themes across apps/journeys
-const mockPainData: Array<Omit<PainPoint, 'impactScore' | 'estimatedMentionsCount'>> = [
-  {
-    id: '1',
-    title: 'Performance & Loading Speed Issues',
-    percentage: 39,
-    affectedApps: ['1Returns', 'Order Up', 'Curbside', 'Order Fulfillment'],
-    monthsActive: 9,
-    trendDirection: 'stable',
-    totalMentions: 487,
-    description: 'Users consistently report slow load times, system lag, and delayed responses across multiple applications',
-    severity: 'high',
-  },
-  {
-    id: '2',
-    title: 'Receipt Lookup & Search Problems',
-    percentage: 28,
-    affectedApps: ['1Returns', 'Order Up'],
-    monthsActive: 9,
-    trendDirection: 'stable',
-    totalMentions: 349,
-    description: 'Receipt scanning and lookup functionality frequently fails or requires multiple attempts',
-    severity: 'high',
-  },
-  {
-    id: '3',
-    title: 'Cross-System Transition Delays',
-    percentage: 28,
-    affectedApps: ['1Returns', 'Order Up', 'Specialty Project tool', 'Curbside'],
-    monthsActive: 5,
-    trendDirection: 'stable',
-    totalMentions: 298,
-    description: 'Switching between applications causes 30-45 second delays and requires manual data re-entry',
-    severity: 'high',
-  },
-  {
-    id: '4',
-    title: 'Refund Processing Bottlenecks',
-    percentage: 19,
-    affectedApps: ['Order Up'],
-    monthsActive: 3,
-    trendDirection: 'increasing',
-    trendPercentage: 12,
-    totalMentions: 237,
-    description: 'Refund step requires unnecessary manager approvals for standard returns that should be automatic',
-    severity: 'medium',
-  },
-  {
-    id: '5',
-    title: 'Complex Navigation & UI Confusion',
-    percentage: 18,
-    affectedApps: ['1Returns', 'Specialty Project tool', 'Engage'],
-    monthsActive: 6,
-    trendDirection: 'decreasing',
-    trendPercentage: 8,
-    totalMentions: 224,
-    description: 'Users struggle to find key features and navigate through complex menu structures',
-    severity: 'medium',
-  },
-  {
-    id: '6',
-    title: 'Mobile Experience Issues',
-    percentage: 15,
-    affectedApps: ['Curbside', 'Order Fulfillment'],
-    monthsActive: 4,
-    trendDirection: 'increasing',
-    trendPercentage: 15,
-    totalMentions: 187,
-    description: 'Mobile versions are difficult to use, with layout issues and touch target problems',
-    severity: 'medium',
-  },
-  {
-    id: '7',
-    title: 'Error Messages Unclear',
-    percentage: 12,
-    affectedApps: ['1Returns', 'Order Up', 'Curbside'],
-    monthsActive: 7,
-    trendDirection: 'stable',
-    totalMentions: 149,
-    description: 'Error messages don\'t provide clear guidance on how to resolve issues',
-    severity: 'low',
-  },
-  {
-    id: '8',
-    title: 'Manual Data Re-entry Required',
-    percentage: 11,
-    affectedApps: ['1Returns', 'Order Up', 'Curbside', 'Specialty Project tool'],
-    monthsActive: 8,
-    trendDirection: 'stable',
-    totalMentions: 137,
-    description: 'Same information must be typed into multiple systems instead of automatic transfer',
-    severity: 'medium',
-  },
-  {
-    id: '9',
-    title: 'Inventory Sync Failures',
-    percentage: 10,
-    affectedApps: ['Specialty Project tool', 'Order Up', 'Engage'],
-    monthsActive: 12,
-    trendDirection: 'increasing',
-    trendPercentage: 18,
-    totalMentions: 124,
-    description: 'Inventory counts don\'t sync properly between systems, leading to overselling',
-    severity: 'high',
-  },
-  {
-    id: '10',
-    title: 'Limited Search Filters',
-    percentage: 9,
-    affectedApps: ['Curbside', '1Returns'],
-    monthsActive: 15,
-    trendDirection: 'stable',
-    totalMentions: 112,
-    description: 'Search functionality lacks advanced filtering options needed for complex queries',
-    severity: 'medium',
-  },
-  {
-    id: '11',
-    title: 'Report Generation Timeout',
-    percentage: 9,
-    affectedApps: ['Order Up', 'Engage'],
-    monthsActive: 4,
-    trendDirection: 'stable',
-    totalMentions: 108,
-    description: 'Large reports time out before completing, requiring multiple attempts',
-    severity: 'medium',
-  },
-  {
-    id: '12',
-    title: 'Accessibility Issues',
-    percentage: 8,
-    affectedApps: ['Curbside', '1Returns', 'Order Up'],
-    monthsActive: 18,
-    trendDirection: 'decreasing',
-    trendPercentage: 5,
-    totalMentions: 99,
-    description: 'Screen readers and keyboard navigation don\'t work properly across interfaces',
-    severity: 'medium',
-  },
-  {
-    id: '13',
-    title: 'Shipping Label Print Failures',
-    percentage: 8,
-    affectedApps: ['Order Fulfillment', 'Engage'],
-    monthsActive: 6,
-    trendDirection: 'increasing',
-    trendPercentage: 10,
-    totalMentions: 95,
-    description: 'Labels fail to print correctly or print with incorrect formatting',
-    severity: 'high',
-  },
-  {
-    id: '14',
-    title: 'Customer Contact Info Missing',
-    percentage: 7,
-    affectedApps: ['Curbside', '1Returns'],
-    monthsActive: 5,
-    trendDirection: 'stable',
-    totalMentions: 87,
-    description: 'Customer email and phone numbers not displaying when needed for follow-up',
-    severity: 'medium',
-  },
-  {
-    id: '15',
-    title: 'Barcode Scanner Compatibility',
-    percentage: 7,
-    affectedApps: ['Specialty Project tool', 'Order Fulfillment', '1Returns'],
-    monthsActive: 13,
-    trendDirection: 'stable',
-    totalMentions: 84,
-    description: 'External barcode scanners frequently disconnect or fail to register scans',
-    severity: 'low',
-  },
-  {
-    id: '16',
-    title: 'Order Status Not Updating',
-    percentage: 7,
-    affectedApps: ['Order Up', 'Curbside'],
-    monthsActive: 8,
-    trendDirection: 'increasing',
-    trendPercentage: 14,
-    totalMentions: 81,
-    description: 'Order status remains stuck in "processing" even after shipment',
-    severity: 'high',
-  },
-  {
-    id: '17',
-    title: 'Browser Compatibility Problems',
-    percentage: 6,
-    affectedApps: ['Curbside', 'Order Up', 'Engage'],
-    monthsActive: 11,
-    trendDirection: 'stable',
-    totalMentions: 74,
-    description: 'Certain features don\'t work in Safari and older browsers',
-    severity: 'low',
-  },
-  {
-    id: '18',
-    title: 'Password Reset Flow Broken',
-    percentage: 6,
-    affectedApps: ['Curbside', '1Returns'],
-    monthsActive: 2,
-    trendDirection: 'increasing',
-    trendPercentage: 22,
-    totalMentions: 71,
-    description: 'Password reset emails not arriving or links expiring too quickly',
-    severity: 'medium',
-  },
-  {
-    id: '19',
-    title: 'Return Window Calculation Errors',
-    percentage: 6,
-    affectedApps: ['1Returns', 'Curbside'],
-    monthsActive: 7,
-    trendDirection: 'stable',
-    totalMentions: 68,
-    description: 'System incorrectly calculates whether items are within return window',
-    severity: 'high',
-  },
-  {
-    id: '20',
-    title: 'Notification Overload',
-    percentage: 5,
-    affectedApps: ['Order Up', 'Order Fulfillment', 'Engage'],
-    monthsActive: 9,
-    trendDirection: 'increasing',
-    trendPercentage: 8,
-    totalMentions: 62,
-    description: 'Too many email and in-app notifications causing important alerts to be missed',
-    severity: 'low',
-  },
-  {
-    id: '21',
-    title: 'Image Upload Failures',
-    percentage: 5,
-    affectedApps: ['1Returns', 'Curbside'],
-    monthsActive: 4,
-    trendDirection: 'stable',
-    totalMentions: 59,
-    description: 'Product or damage photos fail to upload during returns process',
-    severity: 'medium',
-  },
-  {
-    id: '22',
-    title: 'Session Timeout Too Aggressive',
-    percentage: 5,
-    affectedApps: ['Order Up', 'Engage', 'Specialty Project tool'],
-    monthsActive: 14,
-    trendDirection: 'stable',
-    totalMentions: 56,
-    description: 'Users get logged out in the middle of tasks, losing unsaved work',
-    severity: 'medium',
-  },
-  {
-    id: '23',
-    title: 'Bulk Action Limitations',
-    percentage: 4,
-    affectedApps: ['Order Up', 'Specialty Project tool'],
-    monthsActive: 10,
-    trendDirection: 'decreasing',
-    trendPercentage: 6,
-    totalMentions: 52,
-    description: 'Cannot process more than 50 items at once in bulk operations',
-    severity: 'low',
-  },
-  {
-    id: '24',
-    title: 'Tax Calculation Inaccuracies',
-    percentage: 4,
-    affectedApps: ['Order Up', 'Curbside'],
-    monthsActive: 3,
-    trendDirection: 'increasing',
-    trendPercentage: 25,
-    totalMentions: 49,
-    description: 'Sales tax calculations incorrect for certain states and product categories',
-    severity: 'high',
-  },
-  {
-    id: '25',
-    title: 'Return Labels Not Generated',
-    percentage: 4,
-    affectedApps: ['1Returns', 'Order Fulfillment'],
-    monthsActive: 5,
-    trendDirection: 'stable',
-    totalMentions: 47,
-    description: 'Prepaid return labels fail to generate for approved returns',
-    severity: 'high',
-  },
-  {
-    id: '26',
-    title: 'Address Validation Too Strict',
-    percentage: 4,
-    affectedApps: ['Curbside', 'Order Fulfillment'],
-    monthsActive: 16,
-    trendDirection: 'stable',
-    totalMentions: 44,
-    description: 'Valid addresses rejected by validation system, blocking orders',
-    severity: 'medium',
-  },
-  {
-    id: '27',
-    title: 'Language Toggle Not Persisting',
-    percentage: 3,
-    affectedApps: ['Curbside'],
-    monthsActive: 6,
-    trendDirection: 'stable',
-    totalMentions: 41,
-    description: 'Language preference resets to English after each session',
-    severity: 'low',
-  },
-  {
-    id: '28',
-    title: 'Discount Code Application Errors',
-    percentage: 3,
-    affectedApps: ['Order Up', 'Curbside'],
-    monthsActive: 2,
-    trendDirection: 'increasing',
-    trendPercentage: 30,
-    totalMentions: 38,
-    description: 'Valid promo codes rejected or discount amounts calculated incorrectly',
-    severity: 'high',
-  },
-  {
-    id: '29',
-    title: 'Export File Format Issues',
-    percentage: 3,
-    affectedApps: ['Order Up', 'Specialty Project tool', 'Engage'],
-    monthsActive: 8,
-    trendDirection: 'stable',
-    totalMentions: 36,
-    description: 'Exported CSV and Excel files have formatting problems and missing columns',
-    severity: 'low',
-  },
-  {
-    id: '30',
-    title: 'Dashboard Widget Loading Errors',
-    percentage: 3,
-    affectedApps: ['Order Up', 'Engage'],
-    monthsActive: 4,
-    trendDirection: 'stable',
-    totalMentions: 33,
-    description: 'Dashboard widgets fail to load data intermittently',
-    severity: 'medium',
-  },
-  {
-    id: '31',
-    title: 'Gift Message Character Limit',
-    percentage: 3,
-    affectedApps: ['Curbside', 'Order Up'],
-    monthsActive: 20,
-    trendDirection: 'stable',
-    totalMentions: 31,
-    description: 'Gift message field has unreasonably short character limit',
-    severity: 'low',
-  },
-  {
-    id: '32',
-    title: 'Return Reason Dropdown Incomplete',
-    percentage: 2,
-    affectedApps: ['1Returns'],
-    monthsActive: 7,
-    trendDirection: 'stable',
-    totalMentions: 28,
-    description: 'Common return reasons missing from dropdown, forcing "Other" selection',
-    severity: 'low',
-  },
-  {
-    id: '33',
-    title: 'Stock Alert Threshold Not Configurable',
-    percentage: 2,
-    affectedApps: ['Specialty Project tool'],
-    monthsActive: 12,
-    trendDirection: 'stable',
-    totalMentions: 26,
-    description: 'Cannot customize low stock alert thresholds per product',
-    severity: 'medium',
-  },
-  {
-    id: '34',
-    title: 'Multi-Location Shipping Calculation Wrong',
-    percentage: 2,
-    affectedApps: ['Order Fulfillment', 'Order Up'],
-    monthsActive: 5,
-    trendDirection: 'increasing',
-    trendPercentage: 15,
-    totalMentions: 24,
-    description: 'Shipping costs incorrect when order ships from multiple warehouses',
-    severity: 'high',
-  },
-  {
-    id: '35',
-    title: 'Color Scheme Hard to Read',
-    percentage: 2,
-    affectedApps: ['Engage', 'Specialty Project tool'],
-    monthsActive: 15,
-    trendDirection: 'stable',
-    totalMentions: 22,
-    description: 'Low contrast text difficult to read, especially in bright environments',
-    severity: 'low',
-  },
-  {
-    id: '36',
-    title: 'Carrier Service Unavailable Errors',
-    percentage: 2,
-    affectedApps: ['Order Fulfillment', 'Engage'],
-    monthsActive: 3,
-    trendDirection: 'increasing',
-    trendPercentage: 20,
-    totalMentions: 21,
-    description: 'Shipping carrier APIs frequently timeout or return errors',
-    severity: 'high',
-  },
-  {
-    id: '37',
-    title: 'Historical Data Access Limited',
-    percentage: 2,
-    affectedApps: ['Order Up', 'Curbside'],
-    monthsActive: 18,
-    trendDirection: 'stable',
-    totalMentions: 19,
-    description: 'Cannot view orders or returns older than 12 months',
-    severity: 'medium',
-  },
-  {
-    id: '38',
-    title: 'Duplicate Order Creation Possible',
-    percentage: 1,
-    affectedApps: ['Order Up', 'Customer Portal'],
-    monthsActive: 4,
-    trendDirection: 'increasing',
-    trendPercentage: 35,
-    totalMentions: 17,
-    description: 'Double-clicking submit button creates duplicate orders',
-    severity: 'high',
-  },
-  {
-    id: '39',
-    title: 'In-Store Pickup Location Unclear',
-    percentage: 1,
-    affectedApps: ['Customer Portal', 'Order Up'],
-    monthsActive: 6,
-    trendDirection: 'stable',
-    totalMentions: 15,
-    description: 'Pickup instructions don\'t clearly indicate which entrance or counter to use',
-    severity: 'low',
-  },
-  {
-    id: '40',
-    title: 'Product Variant Selection Confusing',
-    percentage: 1,
-    affectedApps: ['Customer Portal'],
-    monthsActive: 9,
-    trendDirection: 'stable',
-    totalMentions: 14,
-    description: 'Size/color selection UI unclear, leading to wrong items ordered',
-    severity: 'medium',
-  },
-  {
-    id: '41',
-    title: 'Wishlist Sync Issues',
-    percentage: 1,
-    affectedApps: ['Customer Portal'],
-    monthsActive: 11,
-    trendDirection: 'decreasing',
-    trendPercentage: 10,
-    totalMentions: 12,
-    description: 'Wishlist items don\'t sync across devices properly',
-    severity: 'low',
-  },
-  {
-    id: '42',
-    title: 'Refund Method Restrictions',
-    percentage: 1,
-    affectedApps: ['1Returns', 'Order Up'],
-    monthsActive: 7,
-    trendDirection: 'stable',
-    totalMentions: 11,
-    description: 'Limited options for refund method, especially for international orders',
-    severity: 'medium',
-  },
-  {
-    id: '43',
-    title: 'Shipping Carrier Tracking Links Broken',
-    percentage: 1,
-    affectedApps: ['Customer Portal', 'Shipping Manager'],
-    monthsActive: 2,
-    trendDirection: 'increasing',
-    trendPercentage: 40,
-    totalMentions: 10,
-    description: 'Tracking number links lead to carrier error pages',
-    severity: 'medium',
-  },
-  {
-    id: '44',
-    title: 'Product Review Submission Failures',
-    percentage: 1,
-    affectedApps: ['Customer Portal'],
-    monthsActive: 8,
-    trendDirection: 'stable',
-    totalMentions: 9,
-    description: 'Product reviews fail to submit with vague error messages',
-    severity: 'low',
-  },
-  {
-    id: '45',
-    title: 'Batch Update Processing Slow',
-    percentage: 1,
-    affectedApps: ['Inventory Manager', 'Order Up'],
-    monthsActive: 13,
-    trendDirection: 'stable',
-    totalMentions: 8,
-    description: 'Bulk inventory updates take excessively long to process',
-    severity: 'medium',
-  },
-  {
-    id: '46',
-    title: 'Return Item Condition Assessment Unclear',
-    percentage: 1,
-    affectedApps: ['1Returns'],
-    monthsActive: 5,
-    trendDirection: 'stable',
-    totalMentions: 7,
-    description: 'Guidelines for item condition (new/used/damaged) not clearly defined',
-    severity: 'low',
-  },
-  {
-    id: '47',
-    title: 'Order Cancellation Window Too Short',
-    percentage: 1,
-    affectedApps: ['Customer Portal', 'Order Up'],
-    monthsActive: 10,
-    trendDirection: 'stable',
-    totalMentions: 6,
-    description: 'Orders cannot be cancelled after just a few minutes',
-    severity: 'medium',
-  },
-  {
-    id: '48',
-    title: 'Gift Card Balance Check Unreliable',
-    percentage: 1,
-    affectedApps: ['Customer Portal', 'Order Up'],
-    monthsActive: 4,
-    trendDirection: 'increasing',
-    trendPercentage: 28,
-    totalMentions: 5,
-    description: 'Gift card balance lookup frequently fails or shows incorrect amounts',
-    severity: 'medium',
-  },
-];
-
 const getSeverityColor = (severity: 'high' | 'medium' | 'low') => {
   if (severity === 'high') return { bg: 'bg-red-50', border: 'border-red-200', text: 'text-red-900', badge: 'bg-red-100 text-red-800 border-red-300' };
   if (severity === 'medium') return { bg: 'bg-orange-50', border: 'border-orange-200', text: 'text-orange-900', badge: 'bg-orange-100 text-orange-800 border-orange-300' };
@@ -639,6 +90,7 @@ export function TopPains({
   onNavigateAllApps,
   onNavigateKeyJourneys,
   onNavigateTopPains,
+  onNavigateTopPainDetail,
   onNavigateAdmin,
   onNavigateExport,
   isFeatureEnabled = true,
@@ -675,8 +127,6 @@ export function TopPains({
 
   const [scopeFilter, setScopeFilter] = useState<string>('all');
   const [visualizationView, setVisualizationView] = useState<'both' | 'ranking' | 'trends'>('both');
-  const [selectedPainForDetail, setSelectedPainForDetail] = useState<PainPoint | null>(null);
-  const [detailPanelOpen, setDetailPanelOpen] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [painData, setPainData] = useState<PainPoint[]>([]);
   const [rawObservations, setRawObservations] = useState<ObservationRow[]>([]);
@@ -685,7 +135,6 @@ export function TopPains({
   const [availableApps, setAvailableApps] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [prevStats] = useState<ReturnType<typeof computeSummary> | null>(null);
   const [recentPeriods, setRecentPeriods] = useState<Array<{ period: string; label: string }>>([]);
   const [seriesByThemeKey, setSeriesByThemeKey] = useState<Record<string, number[]>>({});
   const [dataMonthsCount, setDataMonthsCount] = useState<number>(0);
@@ -994,13 +443,42 @@ export function TopPains({
     };
   }, [timePeriod.period, timePeriod.format]);
 
-  const prevLabel = 'previous period';
-
   // Filter data by scope (app) to support focused drill-downs.
   const scopedObservations = useMemo(() => {
     if (scopeFilter === 'all') return rawObservations;
     return rawObservations.filter((row) => row.app_name === scopeFilter);
   }, [rawObservations, scopeFilter]);
+
+  const prevPeriodData = useMemo(() => {
+    if (scopedObservations.length === 0) {
+      return { label: 'previous period', stats: null };
+    }
+
+    const periodMap = new Map<string, { period: string; label: string; sortOrder: number }>();
+    scopedObservations.forEach((row) => {
+      if (!row.period || row.sort_order === null || row.sort_order === undefined) return;
+      const label = row.period_label ?? row.period;
+      if (!periodMap.has(row.period)) {
+        periodMap.set(row.period, { period: row.period, label, sortOrder: row.sort_order });
+      }
+    });
+
+    const periods = Array.from(periodMap.values()).sort((a, b) => a.sortOrder - b.sortOrder);
+    if (periods.length < 2) {
+      return { label: 'previous period', stats: null };
+    }
+
+    const previous = periods[periods.length - 2];
+    const prevObservations = scopedObservations.filter((row) => row.period === previous.period);
+    const prevPains = buildPainPoints(prevObservations, normalizedThemes, themeMappings);
+    return {
+      label: previous.label,
+      stats: computeSummary(prevPains),
+    };
+  }, [scopedObservations, normalizedThemes, themeMappings]);
+
+  const prevStats = prevPeriodData.stats;
+  const prevLabel = prevPeriodData.label;
 
   const scopedPainData = useMemo(() => {
     if (scopeFilter === 'all') return painData;
@@ -1030,30 +508,6 @@ export function TopPains({
 
   const scopedDataMonthsCount = scopeFilter === 'all' ? dataMonthsCount : scopedPeriods.length;
 
-  const selectedPainTimeSeries = useMemo(() => {
-    if (!selectedPainForDetail) return [];
-    const periodMap = new Map<string, { period: string; label: string; sort_order: number }>();
-    scopedObservations.forEach((row) => {
-      if (!row.period || row.sort_order === null || row.sort_order === undefined) return;
-      const label = row.period_label ?? row.period;
-      if (!periodMap.has(row.period)) {
-        periodMap.set(row.period, { period: row.period, label, sort_order: row.sort_order });
-      }
-    });
-    const periods = Array.from(periodMap.values()).sort((a, b) => a.sort_order - b.sort_order);
-    const allSeries = buildRecentSeries(
-      scopedObservations,
-      normalizedThemes,
-      themeMappings,
-      periods.map((row) => ({ period: row.period, label: row.label })),
-    );
-    const values = allSeries[selectedPainForDetail.id] ?? [];
-    return periods.map((period, index) => ({
-      label: period.label,
-      value: values[index] ?? 0,
-    }));
-  }, [normalizedThemes, scopedObservations, selectedPainForDetail, themeMappings]);
-
   const getImpactScoreForScope = (pain: PainPoint) => {
     if (scopeFilter === 'all') return pain.impactScore;
     const divisor = Math.max(pain.affectedApps.length, 1);
@@ -1077,6 +531,7 @@ export function TopPains({
   };
 
   const displayedPains = getDisplayedPains();
+  const fullPainById = useMemo(() => new Map(painData.map((pain) => [pain.id, pain])), [painData]);
   const top10Pains = displayedPains.slice(0, 10);
   const top5Pains = displayedPains.slice(0, 5);
   const trendValues = top5Pains.flatMap((pain) => scopedSeriesByThemeKey[pain.id] ?? []);
@@ -1091,15 +546,14 @@ export function TopPains({
 
   const trendLabels = scopedRecentPeriods.map((period) => period.label);
   const lineColors = ['#2563eb', '#10b981', '#f97316', '#a855f7', '#0ea5e9'];
+  const scopeTitle = scopeFilter === 'all' ? null : scopeFilter;
 
   const handlePainClick = (pain: PainPoint) => {
-    setSelectedPainForDetail(pain);
-    setDetailPanelOpen(true);
-  };
-
-  const closeDetailPanel = () => {
-    setDetailPanelOpen(false);
-    setTimeout(() => setSelectedPainForDetail(null), 300);
+    // Delegate navigation to the full-page detail view.
+    if (!onNavigateTopPainDetail) return;
+    const scopeLabel = scopeFilter === 'all' ? 'All Categories' : scopeFilter;
+    const defaultAppName = scopeFilter === 'all' ? undefined : scopeFilter;
+    onNavigateTopPainDetail(pain.id, scopeLabel, defaultAppName);
   };
 
   // Safety check - don't render if no pains
@@ -1175,7 +629,9 @@ export function TopPains({
           {/* Section Header with Toggle */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 gap-3">
             <div>
-              <h2 className="text-slate-900">Pain Point Analysis</h2>
+              <h2 className="text-slate-900">
+                {scopeTitle ? `${scopeTitle} - Pain Point Analysis` : 'Pain Point Analysis'}
+              </h2>
               <p className="text-slate-600">Top issues reported via feedback</p>
             </div>
             
@@ -1223,7 +679,9 @@ export function TopPains({
               {(visualizationView === 'both' || visualizationView === 'ranking') && (
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
-                    <h3 className="font-semibold text-slate-900">Top 10 Pain Points</h3>
+                    <h3 className="font-semibold text-slate-900">
+                      {scopeTitle ? `Top 10 Pain Points for ${scopeTitle}` : 'Top 10 Pain Points'}
+                    </h3>
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <button
@@ -1261,6 +719,8 @@ export function TopPains({
                       const SeverityIcon = pain.severity === 'high' ? AlertTriangle : pain.severity === 'medium' ? AlertCircle : Info;
                         const maxMentions = top10Pains[0]?.totalMentions ?? 1;
                       const barWidth = (pain.totalMentions / maxMentions) * 100;
+                      const fullPain = fullPainById.get(pain.id) ?? pain;
+                      const fullAffectedApps = fullPain.affectedApps;
                       
                       return (
                         <button
@@ -1278,11 +738,9 @@ export function TopPains({
                             <span className="text-sm font-semibold text-slate-900 flex-1 truncate group-hover:text-slate-700">
                               {pain.title}
                             </span>
-                            {scopeFilter === 'all' && (
-                              <span className="text-xs font-semibold text-slate-600 bg-slate-100 px-2 py-0.5 rounded">
-                                {pain.affectedApps.length} {pain.affectedApps.length === 1 ? 'app' : 'apps'}
-                              </span>
-                            )}
+                            <span className="text-xs font-semibold text-slate-600 bg-slate-100 px-2 py-0.5 rounded">
+                              {fullAffectedApps.length} {fullAffectedApps.length === 1 ? 'app' : 'apps'}
+                            </span>
                           </div>
                           <div className="ml-8 relative">
                             <div className="h-7 bg-slate-100 rounded overflow-hidden">
@@ -1317,7 +775,9 @@ export function TopPains({
               {(visualizationView === 'both' || visualizationView === 'trends') && (
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
-                    <h3 className="font-semibold text-slate-900">Top 5 Pains: Last 3 Months</h3>
+                    <h3 className="font-semibold text-slate-900">
+                      {scopeTitle ? `Top 5 Trends for ${scopeTitle}` : 'Top 5 Pains: Last 3 Months'}
+                    </h3>
                     <span className="text-sm text-slate-600">mentions per month</span>
                   </div>
                   
@@ -1441,11 +901,14 @@ export function TopPains({
           <section className="space-y-4 min-w-0">
             <div className="mb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
               <div>
-                <h2 className="text-slate-900">All Pain Points</h2>
+                <h2 className="text-slate-900">
+                  {scopeTitle ? `${scopeTitle} - Pain Points` : 'All Pain Points'}
+                </h2>
                 <p className="text-slate-600">
                   {displayedPains.length > 0 ? (
                     <>
                       Showing {((currentPage - 1) * itemsPerPage) + 1}-{Math.min(currentPage * itemsPerPage, displayedPains.length)} of {displayedPains.length}
+                      {scopeTitle ? ` for ${scopeTitle}` : ''}
                     </>
                   ) : (
                     'No pain points found'
@@ -1464,14 +927,16 @@ export function TopPains({
             {displayedPains.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).map((pain, index) => {
               // Calculate global index
               const globalIndex = (currentPage - 1) * itemsPerPage + index;
+              const fullPain = fullPainById.get(pain.id) ?? pain;
+              const fullAffectedApps = fullPain.affectedApps;
               
               // Get severity icon
               const SeverityIcon = pain.severity === 'high' ? AlertTriangle : pain.severity === 'medium' ? AlertCircle : Info;
               const severityLabel = pain.severity === 'high'
-                ? 'Perceived Severity: High'
+                ? 'High Severity'
                 : pain.severity === 'medium'
-                  ? 'Perceived Severity: Medium'
-                  : 'Perceived Severity: Low';
+                  ? 'Medium Severity'
+                  : 'Low Severity';
               const severityColors = pain.severity === 'high' 
                 ? 'bg-red-100 border-red-300 text-red-800' 
                 : pain.severity === 'medium' 
@@ -1479,71 +944,136 @@ export function TopPains({
                 : 'bg-yellow-100 border-yellow-300 text-yellow-800';
               
               return (
-                <Card key={pain.id} className="p-4 sm:p-6 border-slate-200">
-                  <div className="flex items-start justify-between mb-3">
-                    <div className="flex-1">
-                      <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 mb-3">
-                        <div className="flex items-center gap-2">
-                          <SeverityIcon className="size-5 text-slate-900 flex-shrink-0" />
-                          <span className="px-2 py-1 rounded text-sm font-semibold border border-slate-300 bg-slate-50 text-slate-700">
-                            #{globalIndex + 1}
+                <Card
+                  key={pain.id}
+                  className="relative border-slate-200 border-l-4 border-l-orange-600 cursor-pointer shadow-sm hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 overflow-hidden group"
+                  onClick={() => handlePainClick(pain)}
+                >
+                  <div className="p-4 sm:p-6">
+                    <div className="flex items-start justify-between mb-3">
+                      <div className="flex-1">
+                        <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 mb-3">
+                          <div className="flex items-center gap-2">
+                            <SeverityIcon className="size-5 text-slate-900 flex-shrink-0" />
+                            <span className="px-2 py-1 rounded text-sm font-semibold border border-slate-300 bg-slate-50 text-slate-700">
+                              #{globalIndex + 1}
+                            </span>
+                          </div>
+                          <h3 className="font-semibold text-slate-900 flex-1">{pain.title}</h3>
+                          <span className="px-3 py-1 rounded bg-slate-100 text-slate-900 font-semibold text-sm whitespace-nowrap self-start">
+                            {Math.round(pain.percentage)}% of feedback
                           </span>
                         </div>
-                        <h3 className="font-semibold text-slate-900 flex-1">{pain.title}</h3>
-                        <span className="px-3 py-1 rounded bg-slate-100 text-slate-900 font-semibold text-sm whitespace-nowrap self-start">
-                          {Math.round(pain.percentage)}% of feedback
-                        </span>
-                      </div>
 
-                      <div className="flex flex-wrap items-center gap-2 mb-3">
-                        <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-white border border-slate-300 text-slate-700 text-xs font-semibold">
-                          <Clock className="size-3" />
-                          Duration: {pain.monthsActive} months
-                        </span>
-
-                        <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded border text-xs font-semibold ${severityColors}`}>
-                          <SeverityIcon className="size-3" />
-                          {severityLabel}
-                        </span>
-                        
-                        {scopeFilter === 'all' && pain.affectedApps.length > 1 && (
+                        <div className="flex flex-wrap items-center gap-2 mb-3">
                           <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-white border border-slate-300 text-slate-700 text-xs font-semibold">
-                            <Link2 className="size-3" />
-                            {pain.affectedApps.length} apps
+                            <Clock className="size-3" />
+                            Active {pain.monthsActive} months
                           </span>
-                        )}
 
-                        {pain.trendDirection === 'increasing' && pain.trendPercentage && (
-                          <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-white border border-slate-300 text-slate-700 text-xs font-semibold">
-                            <TrendingUp className="size-3" />
-                            {pain.trendPercentage}% vs last Q
+                          <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded border text-xs font-semibold ${severityColors}`}>
+                            <SeverityIcon className="size-3" />
+                            {severityLabel}
                           </span>
-                        )}
 
-                        {pain.trendDirection === 'decreasing' && pain.trendPercentage && (
-                          <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-white border border-slate-300 text-slate-700 text-xs font-semibold">
-                            <TrendingDown className="size-3" />
-                            {pain.trendPercentage}% vs last Q
-                          </span>
-                        )}
-
-                        <span className="text-slate-600 text-sm">
-                          {pain.totalMentions} mentions
-                          {pain.estimatedMentionsCount > 0 && (
-                            <span className="text-slate-500"> • {pain.estimatedMentionsCount} est.</span>
+                          {fullAffectedApps.length > 1 && (
+                            <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-white border border-slate-300 text-slate-700 text-xs font-semibold">
+                              <Link2 className="size-3" />
+                              {fullAffectedApps.length} apps
+                            </span>
                           )}
-                        </span>
+
+                          {pain.trendDirection === 'increasing' && pain.trendPercentage && (
+                            <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-white border border-slate-300 text-slate-700 text-xs font-semibold">
+                              <TrendingUp className="size-3" />
+                              {pain.trendPercentage}% vs last Q
+                            </span>
+                          )}
+
+                          {pain.trendDirection === 'decreasing' && pain.trendPercentage && (
+                            <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-white border border-slate-300 text-slate-700 text-xs font-semibold">
+                              <TrendingDown className="size-3" />
+                              {pain.trendPercentage}% vs last Q
+                            </span>
+                          )}
+
+                          <span className="text-slate-600 text-sm">
+                            {pain.totalMentions} mentions
+                            {pain.estimatedMentionsCount > 0 && (
+                              <span className="text-slate-500"> • {pain.estimatedMentionsCount} est.</span>
+                            )}
+                          </span>
+                        </div>
+
+                        <p className="text-slate-700 mb-3">{pain.description}</p>
+
+                        <div className="flex flex-col sm:flex-row sm:items-start gap-2">
+                          <span className="text-slate-600 font-semibold whitespace-nowrap pt-1">Affected Apps:</span>
+                          <div className="flex flex-wrap gap-2">
+                            {fullAffectedApps.map((appName) => {
+                              // Active app badge clears the scope; otherwise set the scope.
+                              const isActiveScope = scopeFilter === appName;
+                              if (isActiveScope) {
+                                return (
+                                  <button
+                                    key={appName}
+                                    onClick={(event) => {
+                                      event.stopPropagation();
+                                      setScopeFilter('all');
+                                      setCurrentPage(1);
+                                    }}
+                                    className="px-3 py-1.5 rounded-md bg-orange-50 text-orange-700 text-sm font-bold cursor-pointer hover:bg-orange-100 transition-colors"
+                                  >
+                                    {appName}
+                                  </button>
+                                );
+                              }
+
+                              return (
+                                <button
+                                  key={appName}
+                                  onClick={(event) => {
+                                    event.stopPropagation();
+                                    setScopeFilter(appName);
+                                    setCurrentPage(1);
+                                  }}
+                                  className="px-3 py-1.5 rounded-md border-2 border-slate-300 bg-white text-slate-700 text-sm font-medium hover:border-orange-500 hover:text-orange-700 hover:bg-orange-50 hover:scale-105 transition-all cursor-pointer"
+                                >
+                                  {appName}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
                       </div>
 
-                      <p className="text-slate-700 mb-3">{pain.description}</p>
-
-                      {scopeFilter === 'all' && (
-                        <div className="flex flex-col sm:flex-row sm:items-center gap-1">
-                          <span className="text-slate-600 font-semibold">Affected Apps:</span>
-                          <span className="text-slate-700">{pain.affectedApps.join(', ')}</span>
+                      <div className="ml-4 flex-shrink-0">
+                        <div className="size-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 group-hover:bg-orange-100 group-hover:text-orange-600 transition-colors">
+                          <ChevronRight className="size-5" />
                         </div>
-                      )}
+                      </div>
                     </div>
+                  </div>
+
+                  <div className="px-4 sm:px-6 py-2.5 bg-slate-50 border-t border-slate-100 flex items-center justify-between text-xs text-slate-600">
+                    <div className="flex items-center gap-3">
+                      <span className="inline-flex items-center gap-1.5">
+                        <LineChart className="size-3.5" />
+                        Trend analysis
+                      </span>
+                      <span className="inline-flex items-center gap-1.5">
+                        <BarChart3 className="size-3.5" />
+                        Journey impact
+                      </span>
+                      <span className="inline-flex items-center gap-1.5">
+                        <AlertCircle className="size-3.5" />
+                        Theme breakdown
+                      </span>
+                    </div>
+                    <span className="text-orange-600 font-semibold group-hover:translate-x-1 transition-transform inline-flex items-center gap-1">
+                      View details
+                      <ChevronRight className="size-3.5" />
+                    </span>
                   </div>
                 </Card>
               );
@@ -1794,211 +1324,6 @@ export function TopPains({
         </div>
       </div>
 
-      {/* Detail Panel */}
-      {detailPanelOpen && selectedPainForDetail && (
-        <div className="fixed inset-0 bg-slate-900/50 z-50 flex items-center justify-center p-4" onClick={closeDetailPanel}>
-          <div 
-            className="bg-white rounded-lg shadow-xl max-w-3xl w-full max-h-[90vh] overflow-y-auto"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Panel Header */}
-            <div className="sticky top-0 bg-white border-b border-slate-200 px-6 py-4 flex items-start justify-between">
-              <div className="flex-1">
-                <div className="flex items-center gap-2 mb-2">
-                  {selectedPainForDetail.severity === 'high' && <AlertTriangle className="size-5 text-red-600" />}
-                  {selectedPainForDetail.severity === 'medium' && <AlertCircle className="size-5 text-orange-600" />}
-                  {selectedPainForDetail.severity === 'low' && <Info className="size-5 text-yellow-600" />}
-                  <h2 className="text-slate-900">{selectedPainForDetail.title}</h2>
-                </div>
-                <p className="text-slate-600">{selectedPainForDetail.description}</p>
-              </div>
-              <button 
-                onClick={closeDetailPanel}
-                className="ml-4 text-slate-400 hover:text-slate-600 transition-colors"
-              >
-                <X className="size-6" />
-              </button>
-            </div>
-
-            {/* Panel Content */}
-            <div className="p-6 space-y-6">
-              {/* Key Metrics */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div className="rounded-xl bg-white p-5 border border-slate-200 shadow-sm">
-                  <div className="text-sm text-slate-600 mb-1">Severity</div>
-                  <div className={`inline-flex items-center gap-1.5 px-2 py-1 rounded border text-sm font-semibold ${
-                    selectedPainForDetail.severity === 'high' ? 'bg-red-100 border-red-300 text-red-800' :
-                    selectedPainForDetail.severity === 'medium' ? 'bg-orange-100 border-orange-300 text-orange-800' :
-                    'bg-yellow-100 border-yellow-300 text-yellow-800'
-                  }`}>
-                    {selectedPainForDetail.severity === 'high' && <AlertTriangle className="size-3" />}
-                    {selectedPainForDetail.severity === 'medium' && <AlertCircle className="size-3" />}
-                    {selectedPainForDetail.severity === 'low' && <Info className="size-3" />}
-                    {selectedPainForDetail.severity.charAt(0).toUpperCase() + selectedPainForDetail.severity.slice(1)}
-                  </div>
-                </div>
-
-                <div className="rounded-xl bg-white p-5 border border-slate-200 shadow-sm">
-                  <div className="text-sm text-slate-600 mb-1">Total Mentions</div>
-                  <div className="text-2xl font-semibold text-slate-900">{selectedPainForDetail.totalMentions}</div>
-                  <div className="text-xs text-slate-600 mt-0.5">
-                    {Math.round(selectedPainForDetail.percentage)}% of feedback
-                  </div>
-                  {selectedPainForDetail.estimatedMentionsCount > 0 && (
-                    <div className="text-xs text-slate-500 mt-0.5">
-                      Includes {selectedPainForDetail.estimatedMentionsCount} estimated
-                    </div>
-                  )}
-                </div>
-
-                <div className="rounded-xl bg-white p-5 border border-slate-200 shadow-sm">
-                  <div className="text-sm text-slate-600 mb-1">Duration</div>
-                  <div className="text-2xl font-semibold text-slate-900">{selectedPainForDetail.monthsActive}</div>
-                  <div className="text-xs text-slate-600 mt-0.5">months active</div>
-                </div>
-
-                <div className="rounded-xl bg-white p-5 border border-slate-200 shadow-sm">
-                  <div className="text-sm text-slate-600 mb-1">Affected Apps</div>
-                  <div className="text-2xl font-semibold text-slate-900">{selectedPainForDetail.affectedApps.length}</div>
-                  <div className="text-xs text-slate-600 mt-0.5">{selectedPainForDetail.affectedApps.length === 1 ? 'application' : 'applications'}</div>
-                </div>
-              </div>
-
-              {/* Trend Chart */}
-              <div>
-                <h3 className="font-semibold text-slate-900 mb-3">Mentions Over Time</h3>
-                <div className="border border-slate-200 rounded-lg p-4">
-                    <div className="relative h-48">
-                    {/* Y-axis labels */}
-                    <div className="absolute left-0 top-0 bottom-8 w-12 pr-2 flex flex-col justify-between text-xs text-slate-600 text-right">
-                      {[0, 1, 2, 3, 4].reverse().map((i) => {
-                        const maxValue = Math.max(1, ...selectedPainTimeSeries.map(d => d.value));
-                        const value = Math.round((maxValue / 4) * i);
-                        return <span key={i}>{value}</span>;
-                      })}
-                    </div>
-                    
-                    {/* Chart */}
-                    <div className="ml-14 h-full pb-8 pt-3">
-                      <svg className="w-full h-full" viewBox="0 0 400 130" preserveAspectRatio="xMidYMid meet">
-                        {/* Grid lines */}
-                        {[0, 1, 2, 3, 4].map((i) => (
-                          <line
-                            key={i}
-                            x1="0"
-                            y1={18 + (i / 4) * 100}
-                            x2="400"
-                            y2={18 + (i / 4) * 100}
-                            stroke="#e2e8f0"
-                            strokeWidth="0.5"
-                          />
-                        ))}
-                        
-                        {/* Line */}
-                        {(() => {
-                          const trendData = selectedPainTimeSeries;
-                          const maxValue = Math.max(1, ...trendData.map(d => d.value));
-                          const color = selectedPainForDetail.severity === 'high' ? '#dc2626' : 
-                                       selectedPainForDetail.severity === 'medium' ? '#ea580c' : 
-                                       '#ca8a04';
-                          
-                          const points = trendData.map((d, i) => {
-                            const x = trendData.length === 1 ? 200 : (i / (trendData.length - 1)) * 400;
-                            const y = 18 + (100 - ((d.value / maxValue) * 100));
-                            return `${x},${y}`;
-                          }).join(' ');
-                          
-                          return (
-                            <g>
-                              <polyline
-                                points={points}
-                                fill="none"
-                                stroke={color}
-                                strokeWidth="2"
-                              />
-                              {/* Data points */}
-                              {trendData.map((d, i) => {
-                                const x = trendData.length === 1 ? 200 : (i / (trendData.length - 1)) * 400;
-                                const y = 18 + (100 - ((d.value / maxValue) * 100));
-                                return (
-                                  <g key={i}>
-                                    <circle
-                                      cx={x}
-                                      cy={y}
-                                      r="5"
-                                      fill={color}
-                                    />
-                                    <text
-                                      x={x}
-                                      y={Math.max(12, y - 8)}
-                                    textAnchor={i === 0 ? 'start' : i === trendData.length - 1 ? 'end' : 'middle'}
-                                    dx={i === 0 ? 4 : i === trendData.length - 1 ? -4 : 0}
-                                    className="text-xs font-semibold fill-slate-700"
-                                  >
-                                    {d.value}
-                                  </text>
-                                  </g>
-                                );
-                              })}
-                            </g>
-                          );
-                        })()}
-                      </svg>
-                      
-                      {/* X-axis labels */}
-                      <div className="flex justify-between px-1 mt-2 text-xs text-slate-600">
-                        {selectedPainTimeSeries.map((segment, i) => (
-                          <span key={i} className="text-center">{segment.label}</span>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                  
-                  {/* Trend indicator */}
-                  <div className="mt-4 flex items-center gap-2">
-                    {selectedPainForDetail.trendDirection === 'increasing' && (
-                      <>
-                        <TrendingUp className="size-4 text-red-600" />
-                        <span className="text-sm text-slate-700">Increasing trend</span>
-                        {selectedPainForDetail.trendPercentage && (
-                          <span className="text-sm font-semibold text-red-600">+{selectedPainForDetail.trendPercentage}%</span>
-                        )}
-                      </>
-                    )}
-                    {selectedPainForDetail.trendDirection === 'decreasing' && (
-                      <>
-                        <TrendingDown className="size-4 text-green-600" />
-                        <span className="text-sm text-slate-700">Decreasing trend</span>
-                        {selectedPainForDetail.trendPercentage && (
-                          <span className="text-sm font-semibold text-green-600">-{selectedPainForDetail.trendPercentage}%</span>
-                        )}
-                      </>
-                    )}
-                    {selectedPainForDetail.trendDirection === 'stable' && (
-                      <>
-                        <div className="w-4 h-0.5 bg-slate-400" />
-                        <span className="text-sm text-slate-700">Stable trend</span>
-                      </>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              {/* Affected Applications */}
-              <div>
-                <h3 className="font-semibold text-slate-900 mb-3">Affected Applications</h3>
-                <div className="flex flex-wrap gap-2">
-                  {selectedPainForDetail.affectedApps.map((app, index) => (
-                    <div key={index} className="inline-flex items-center px-2.5 py-1.5 bg-slate-50 rounded border border-slate-200">
-                      <span className="text-slate-900 text-sm">{app}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

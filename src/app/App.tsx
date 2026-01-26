@@ -9,6 +9,7 @@ import { AllJourneysView } from './components/AllJourneysView';
 import { TimeSeriesView } from './components/TimeSeriesView';
 import { AllAppsTimeGrid } from './components/AllAppsTimeGrid';
 import { TopPains } from './components/TopPains';
+import { TopPainDetail } from './components/TopPainDetail';
 import { ManageThemes } from './components/ManageThemes';
 import { ManageTopPains } from './components/ManageTopPains';
 import { ManageJourneys } from './components/ManageJourneys';
@@ -33,6 +34,7 @@ export type ViewType =
   | 'apps-time-grid-executive'
   | 'apps-time-grid-practitioner'
   | 'top-pains'
+  | 'top-pain-detail'
   | 'admin-manage-themes'
   | 'admin-manage-top-pains'
   | 'admin-manage-journeys'
@@ -72,6 +74,9 @@ interface NavigationState {
   view: ViewType;
   selectedApp?: string | null;
   selectedJourney?: string | null;
+  selectedPainId?: string | null;
+  selectedPainScopeLabel?: string | null;
+  selectedPainAppName?: string | null;
 }
 
 interface FeatureFlags {
@@ -93,6 +98,9 @@ function App() {
   const [currentView, setCurrentView] = useState<ViewType>('portfolio');
   const [selectedApp, setSelectedApp] = useState<string | null>(null);
   const [selectedJourney, setSelectedJourney] = useState<string | null>(null);
+  const [selectedPainId, setSelectedPainId] = useState<string | null>(null);
+  const [selectedPainScopeLabel, setSelectedPainScopeLabel] = useState<string | null>(null);
+  const [selectedPainAppName, setSelectedPainAppName] = useState<string | null>(null);
   const [adminPassword, setAdminPassword] = useState(() => localStorage.getItem('adminPassword') ?? 'happyness');
   const [adminAuthEnabled, setAdminAuthEnabled] = useState(() => (localStorage.getItem('adminAuthEnabled') ?? 'true') !== 'false');
   const [adminShowButton, setAdminShowButton] = useState(() => (localStorage.getItem('adminShowButton') ?? 'true') !== 'false');
@@ -104,7 +112,7 @@ function App() {
   const [isDashboardDialogOpen, setIsDashboardDialogOpen] = useState(false);
   const [pendingAdminRedirect, setPendingAdminRedirect] = useState(false);
   const [navigationHistory, setNavigationHistory] = useState<NavigationState[]>([
-    { view: 'portfolio', selectedApp: null, selectedJourney: null }
+    { view: 'portfolio', selectedApp: null, selectedJourney: null, selectedPainId: null, selectedPainScopeLabel: null, selectedPainAppName: null }
   ]);
   const [timePeriod, setTimePeriod] = useState<TimePeriodData>({
     format: 'month',
@@ -241,11 +249,21 @@ function App() {
 
   const effectiveFeatureFlags = useLocalFeatureFlags ? localFeatureFlags : globalFeatureFlags;
 
-  const pushToHistory = (view: ViewType, appId?: string | null, journeyId?: string | null) => {
+  const pushToHistory = (
+    view: ViewType,
+    appId?: string | null,
+    journeyId?: string | null,
+    painId?: string | null,
+    painScopeLabel?: string | null,
+    painAppName?: string | null,
+  ) => {
     const newState: NavigationState = {
       view,
       selectedApp: appId,
       selectedJourney: journeyId,
+      selectedPainId: painId ?? null,
+      selectedPainScopeLabel: painScopeLabel ?? null,
+      selectedPainAppName: painAppName ?? null,
     };
     setNavigationHistory(prev => [...prev, newState]);
   };
@@ -253,126 +271,163 @@ function App() {
   const basePath = import.meta.env.BASE_URL ?? '/';
   const adminPath = basePath.endsWith('/') ? `${basePath}admin` : `${basePath}/admin`;
 
-  const syncPath = (view: ViewType) => {
+  const syncPath = (view: ViewType, painId?: string | null) => {
+    // Keep the URL in sync for deep-linkable top pain detail.
     const targetPath = view.startsWith('admin') ? adminPath : basePath;
-    if (window.location.pathname !== targetPath) {
-      window.history.pushState({}, '', targetPath);
+    const url = new URL(targetPath, window.location.origin);
+    if (view === 'top-pain-detail' && painId) {
+      url.searchParams.set('pain', painId);
+    }
+    const nextPath = `${url.pathname}${url.search}`;
+    if (`${window.location.pathname}${window.location.search}` !== nextPath) {
+      window.history.pushState({}, '', nextPath);
     }
   };
 
+  const clearPainSelection = () => {
+    setSelectedPainId(null);
+    setSelectedPainScopeLabel(null);
+    setSelectedPainAppName(null);
+  };
+
   const navigateToAppDetail = (appId: string) => {
-    pushToHistory('app-detail-enhanced', appId, null);
+    pushToHistory('app-detail-enhanced', appId, null, null, null, null);
     setSelectedApp(appId);
     setCurrentView('app-detail-enhanced');
+    clearPainSelection();
     syncPath('app-detail-enhanced');
   };
 
   const navigateToJourneyDetail = (journeyId: string) => {
-    pushToHistory('journey-detail-enhanced', null, journeyId);
+    pushToHistory('journey-detail-enhanced', null, journeyId, null, null, null);
     setSelectedJourney(journeyId);
     setCurrentView('journey-detail-enhanced');
+    clearPainSelection();
     syncPath('journey-detail-enhanced');
   };
 
   const navigateToView = (view: ViewType) => {
-    pushToHistory(view, null, null);
+    pushToHistory(view, null, null, null, null, null);
     setCurrentView(view);
+    clearPainSelection();
     syncPath(view);
   };
 
   const navigateToPortfolio = () => {
-    pushToHistory('portfolio', null, null);
+    pushToHistory('portfolio', null, null, null, null, null);
     setCurrentView('portfolio');
     setSelectedApp(null);
     setSelectedJourney(null);
+    clearPainSelection();
     syncPath('portfolio');
   };
 
   const navigateToAllApps = () => {
-    pushToHistory('all-apps', null, null);
+    pushToHistory('all-apps', null, null, null, null, null);
     setCurrentView('all-apps');
     setSelectedApp(null);
     setSelectedJourney(null);
+    clearPainSelection();
     syncPath('all-apps');
   };
 
   const navigateToAllJourneys = () => {
-    pushToHistory('all-journeys', null, null);
+    pushToHistory('all-journeys', null, null, null, null, null);
     setCurrentView('all-journeys');
     setSelectedApp(null);
     setSelectedJourney(null);
+    clearPainSelection();
     syncPath('all-journeys');
   };
 
   const navigateToTopPains = () => {
-    pushToHistory('top-pains', null, null);
+    pushToHistory('top-pains', null, null, null, null, null);
     setCurrentView('top-pains');
     setSelectedApp(null);
     setSelectedJourney(null);
+    clearPainSelection();
     syncPath('top-pains');
   };
 
+  const navigateToTopPainDetail = (painId: string, scopeLabel?: string, appName?: string) => {
+    const label = scopeLabel ?? 'All Categories';
+    pushToHistory('top-pain-detail', null, null, painId, label, appName ?? null);
+    setSelectedPainId(painId);
+    setSelectedPainScopeLabel(label);
+    setSelectedPainAppName(appName ?? null);
+    setCurrentView('top-pain-detail');
+    syncPath('top-pain-detail', painId);
+  };
+
   const navigateToAdminThemes = () => {
-    pushToHistory('admin-manage-themes', null, null);
+    pushToHistory('admin-manage-themes', null, null, null, null, null);
     setCurrentView('admin-manage-themes');
     setSelectedApp(null);
     setSelectedJourney(null);
+    clearPainSelection();
     syncPath('admin-manage-themes');
   };
 
   const navigateToManageThemes = () => {
-    pushToHistory('admin-manage-themes', null, null);
+    pushToHistory('admin-manage-themes', null, null, null, null, null);
     setCurrentView('admin-manage-themes');
     setSelectedApp(null);
     setSelectedJourney(null);
+    clearPainSelection();
     syncPath('admin-manage-themes');
   };
 
   const navigateToManageTopPains = () => {
-    pushToHistory('admin-manage-top-pains', null, null);
+    pushToHistory('admin-manage-top-pains', null, null, null, null, null);
     setCurrentView('admin-manage-top-pains');
     setSelectedApp(null);
     setSelectedJourney(null);
+    clearPainSelection();
     syncPath('admin-manage-top-pains');
   };
 
   const navigateToManageJourneys = () => {
-    pushToHistory('admin-manage-journeys', null, null);
+    pushToHistory('admin-manage-journeys', null, null, null, null, null);
     setCurrentView('admin-manage-journeys');
     setSelectedApp(null);
     setSelectedJourney(null);
+    clearPainSelection();
     syncPath('admin-manage-journeys');
   };
 
   const navigateToManageApps = () => {
-    pushToHistory('admin-manage-apps', null, null);
+    pushToHistory('admin-manage-apps', null, null, null, null, null);
     setCurrentView('admin-manage-apps');
     setSelectedApp(null);
     setSelectedJourney(null);
+    clearPainSelection();
     syncPath('admin-manage-apps');
   };
 
   const navigateToManageSettings = () => {
-    pushToHistory('admin-settings', null, null);
+    pushToHistory('admin-settings', null, null, null, null, null);
     setCurrentView('admin-settings');
     setSelectedApp(null);
     setSelectedJourney(null);
+    clearPainSelection();
     syncPath('admin-settings');
   };
 
   const navigateToFeatureFlags = () => {
-    pushToHistory('admin-feature-flags', null, null);
+    pushToHistory('admin-feature-flags', null, null, null, null, null);
     setCurrentView('admin-feature-flags');
     setSelectedApp(null);
     setSelectedJourney(null);
+    clearPainSelection();
     syncPath('admin-feature-flags');
   };
 
   const navigateToExport = () => {
-    pushToHistory('export-report', null, null);
+    pushToHistory('export-report', null, null, null, null, null);
     setCurrentView('export-report');
     setSelectedApp(null);
     setSelectedJourney(null);
+    clearPainSelection();
     syncPath('export-report');
   };
 
@@ -434,6 +489,22 @@ function App() {
     window.addEventListener('popstate', handlePath);
     return () => window.removeEventListener('popstate', handlePath);
   }, [adminAuthEnabled, adminAuthenticated, adminPath]);
+
+  useEffect(() => {
+    // Support direct entry via ?pain=... (non-admin paths only).
+    const path = window.location.pathname;
+    const normalizedAdminPath = adminPath.endsWith('/') ? adminPath.slice(0, -1) : adminPath;
+    if (path === adminPath || path === normalizedAdminPath) return;
+    const params = new URLSearchParams(window.location.search);
+    const pain = params.get('pain');
+    if (pain) {
+      pushToHistory('top-pain-detail', null, null, pain, 'All Categories', null);
+      setSelectedPainId(pain);
+      setSelectedPainScopeLabel('All Categories');
+      setSelectedPainAppName(null);
+      setCurrentView('top-pain-detail');
+    }
+  }, [adminPath]);
   const handleAdminTabChange = (tab: 'manage-themes' | 'manage-top-pains' | 'manage-journeys' | 'manage-apps' | 'feature-flags' | 'settings') => {
     if (tab === 'manage-themes') {
       navigateToManageThemes();
@@ -474,11 +545,17 @@ function App() {
       setCurrentView(previousState.view);
       setSelectedApp(previousState.selectedApp || null);
       setSelectedJourney(previousState.selectedJourney || null);
+      setSelectedPainId(previousState.selectedPainId || null);
+      setSelectedPainScopeLabel(previousState.selectedPainScopeLabel || null);
+      setSelectedPainAppName(previousState.selectedPainAppName || null);
+      syncPath(previousState.view, previousState.selectedPainId || null);
     } else {
       // Fallback to portfolio if history is empty
       setCurrentView('portfolio');
       setSelectedApp(null);
       setSelectedJourney(null);
+      clearPainSelection();
+      syncPath('portfolio');
     }
   };
 
@@ -636,9 +713,25 @@ function App() {
           onNavigateAllApps={navigateToAllApps}
           onNavigateKeyJourneys={navigateToAllJourneys}
           onNavigateTopPains={navigateToTopPains}
+          onNavigateTopPainDetail={navigateToTopPainDetail}
           onNavigateAdmin={navigateToAdminThemes}
           onNavigateExport={navigateToExport}
           isFeatureEnabled={effectiveFeatureFlags.topPainsEnabled}
+          showAdminButton={adminShowButton}
+        />
+      )}
+      {currentView === 'top-pain-detail' && selectedPainId && (
+        <TopPainDetail
+          painId={selectedPainId}
+          scopeLabel={selectedPainScopeLabel ?? 'All Categories'}
+          defaultAppName={selectedPainAppName ?? undefined}
+          onNavigateBack={navigateBack}
+          onNavigateHome={navigateToPortfolio}
+          onNavigateAllApps={navigateToAllApps}
+          onNavigateKeyJourneys={navigateToAllJourneys}
+          onNavigateTopPains={navigateToTopPains}
+          onNavigateAdmin={requestAdminAccess}
+          onNavigateExport={navigateToExport}
           showAdminButton={adminShowButton}
         />
       )}
