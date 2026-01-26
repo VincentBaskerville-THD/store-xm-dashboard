@@ -1196,129 +1196,137 @@ export function TopPains({
           {/* Summary Cards - Right Column */}
           <aside className="lg:mt-[72px]">
             <div className="flex flex-col gap-3">
-              <Card className="p-4 border-slate-200">
-                <div className="flex items-start gap-3">
-                  <AlertTriangle className="size-5 text-red-600 flex-shrink-0" />
-                  <div className="flex-1">
-                    <div className="text-2xl font-semibold text-slate-900 leading-none mb-0.5">{highSeverityCount}</div>
-                    <h3 className="text-sm text-slate-600 mb-2">Perceived Severity (High)</h3>
-                    {(() => {
-                      if (!prevStats) {
-                        return (
+              {highSeverityCount > 0 && (
+                <Card className="p-4 border-slate-200">
+                  <div className="flex items-start gap-3">
+                    <AlertTriangle className="size-5 text-red-600 flex-shrink-0" />
+                    <div className="flex-1">
+                      <div className="text-2xl font-semibold text-slate-900 leading-none mb-0.5">{highSeverityCount}</div>
+                      <h3 className="text-sm text-slate-600 mb-2">Perceived Severity (High)</h3>
+                      {(() => {
+                        if (!prevStats) {
+                          return (
+                            <div className="flex items-center gap-1 text-xs font-semibold text-slate-500">
+                              <span>No prior period</span>
+                            </div>
+                          );
+                        }
+                        const delta = highSeverityCount - prevStats.highSeverityCount;
+                        const isWorsening = delta > 0;
+                        return delta !== 0 ? (
+                          <div className={`flex items-center gap-1 text-xs font-semibold ${isWorsening ? 'text-red-600' : 'text-green-600'}`}>
+                            {isWorsening ? <TrendingUp className="size-3" /> : <TrendingDown className="size-3" />}
+                            <span>{Math.abs(delta)} from {prevLabel}</span>
+                          </div>
+                        ) : (
                           <div className="flex items-center gap-1 text-xs font-semibold text-slate-500">
-                            <span>No prior period</span>
+                            <span>No change from {prevLabel}</span>
                           </div>
                         );
-                      }
-                      const delta = highSeverityCount - prevStats.highSeverityCount;
-                      const isWorsening = delta > 0;
-                      return delta !== 0 ? (
-                        <div className={`flex items-center gap-1 text-xs font-semibold ${isWorsening ? 'text-red-600' : 'text-green-600'}`}>
-                          {isWorsening ? <TrendingUp className="size-3" /> : <TrendingDown className="size-3" />}
-                          <span>{Math.abs(delta)} from {prevLabel}</span>
-                        </div>
-                      ) : (
-                        <div className="flex items-center gap-1 text-xs font-semibold text-slate-500">
-                          <span>No change from {prevLabel}</span>
-                        </div>
-                      );
-                    })()}
+                      })()}
+                    </div>
                   </div>
-                </div>
-              </Card>
+                </Card>
+              )}
 
-              <Card className="p-4 border-slate-200">
-                <div className="flex items-start gap-3">
-                  <div className="text-xl flex-shrink-0">🔗</div>
-                  <div className="flex-1">
-                    <div className="text-2xl font-semibold text-slate-900 leading-none mb-0.5">{crossAppPainsCount}</div>
-                    <h3 className="text-sm text-slate-600 mb-2">Cross-App Issues</h3>
-                    {(() => {
-                      if (!prevStats) {
-                        return (
+              {crossAppPainsCount > 0 && (
+                <Card className="p-4 border-slate-200">
+                  <div className="flex items-start gap-3">
+                    <div className="text-xl flex-shrink-0">🔗</div>
+                    <div className="flex-1">
+                      <div className="text-2xl font-semibold text-slate-900 leading-none mb-0.5">{crossAppPainsCount}</div>
+                      <h3 className="text-sm text-slate-600 mb-2">Cross-App Issues</h3>
+                      {(() => {
+                        if (!prevStats) {
+                          return (
+                            <div className="flex items-center gap-1 text-xs font-semibold text-slate-500">
+                              <span>No prior period</span>
+                            </div>
+                          );
+                        }
+                        const delta = crossAppPainsCount - prevStats.crossAppPainsCount;
+                        const isWorsening = delta > 0;
+                        return delta !== 0 ? (
+                          <div className={`flex items-center gap-1 text-xs font-semibold ${isWorsening ? 'text-red-600' : 'text-green-600'}`}>
+                            {isWorsening ? <TrendingUp className="size-3" /> : <TrendingDown className="size-3" />}
+                            <span>{Math.abs(delta)} from {prevLabel}</span>
+                          </div>
+                        ) : (
                           <div className="flex items-center gap-1 text-xs font-semibold text-slate-500">
-                            <span>No prior period</span>
+                            <span>No change from {prevLabel}</span>
                           </div>
                         );
-                      }
-                      const delta = crossAppPainsCount - prevStats.crossAppPainsCount;
-                      const isWorsening = delta > 0;
-                      return delta !== 0 ? (
-                        <div className={`flex items-center gap-1 text-xs font-semibold ${isWorsening ? 'text-red-600' : 'text-green-600'}`}>
-                          {isWorsening ? <TrendingUp className="size-3" /> : <TrendingDown className="size-3" />}
-                          <span>{Math.abs(delta)} from {prevLabel}</span>
-                        </div>
-                      ) : (
-                        <div className="flex items-center gap-1 text-xs font-semibold text-slate-500">
-                          <span>No change from {prevLabel}</span>
-                        </div>
-                      );
-                    })()}
+                      })()}
+                    </div>
                   </div>
-                </div>
-              </Card>
+                </Card>
+              )}
 
-              <Card className="p-4 border-slate-200">
-                <div className="flex items-start gap-3">
-                  <Clock className="size-5 text-purple-600 flex-shrink-0" />
-                  <div className="flex-1">
-                    <div className="text-2xl font-semibold text-slate-900 leading-none mb-0.5">{avgMonthsActiveDisplay}</div>
-                    <h3 className="text-sm text-slate-600 mb-2">Avg Duration (mo)</h3>
-                    {(() => {
-                      if (!prevStats) {
-                        return (
+              {avgMonthsActive > 0 && (
+                <Card className="p-4 border-slate-200">
+                  <div className="flex items-start gap-3">
+                    <Clock className="size-5 text-purple-600 flex-shrink-0" />
+                    <div className="flex-1">
+                      <div className="text-2xl font-semibold text-slate-900 leading-none mb-0.5">{avgMonthsActiveDisplay}</div>
+                      <h3 className="text-sm text-slate-600 mb-2">Avg Duration (mo)</h3>
+                      {(() => {
+                        if (!prevStats) {
+                          return (
+                            <div className="flex items-center gap-1 text-xs font-semibold text-slate-500">
+                              <span>No prior period</span>
+                            </div>
+                          );
+                        }
+                        const delta = avgMonthsActive - prevStats.avgMonthsActive;
+                        const isWorsening = delta > 0;
+                        return Math.abs(delta) >= 0.1 ? (
+                          <div className={`flex items-center gap-1 text-xs font-semibold ${isWorsening ? 'text-red-600' : 'text-green-600'}`}>
+                            {isWorsening ? <TrendingUp className="size-3" /> : <TrendingDown className="size-3" />}
+                            <span>{Math.abs(delta).toFixed(1)}mo from {prevLabel}</span>
+                          </div>
+                        ) : (
                           <div className="flex items-center gap-1 text-xs font-semibold text-slate-500">
-                            <span>No prior period</span>
+                            <span>No change from {prevLabel}</span>
                           </div>
                         );
-                      }
-                      const delta = avgMonthsActive - prevStats.avgMonthsActive;
-                      const isWorsening = delta > 0;
-                      return Math.abs(delta) >= 0.1 ? (
-                        <div className={`flex items-center gap-1 text-xs font-semibold ${isWorsening ? 'text-red-600' : 'text-green-600'}`}>
-                          {isWorsening ? <TrendingUp className="size-3" /> : <TrendingDown className="size-3" />}
-                          <span>{Math.abs(delta).toFixed(1)}mo from {prevLabel}</span>
-                        </div>
-                      ) : (
-                        <div className="flex items-center gap-1 text-xs font-semibold text-slate-500">
-                          <span>No change from {prevLabel}</span>
-                        </div>
-                      );
-                    })()}
+                      })()}
+                    </div>
                   </div>
-                </div>
-              </Card>
+                </Card>
+              )}
 
-              <Card className="p-4 border-slate-200">
-                <div className="flex items-start gap-3">
-                  <AlertCircle className="size-5 text-orange-600 flex-shrink-0" />
-                  <div className="flex-1">
-                    <div className="text-2xl font-semibold text-slate-900 leading-none mb-0.5">{chronicCount}</div>
-                    <h3 className="text-sm text-slate-600 mb-2">Chronic Issues</h3>
-                    {(() => {
-                      if (!prevStats) {
-                        return (
+              {chronicCount > 0 && (
+                <Card className="p-4 border-slate-200">
+                  <div className="flex items-start gap-3">
+                    <AlertCircle className="size-5 text-orange-600 flex-shrink-0" />
+                    <div className="flex-1">
+                      <div className="text-2xl font-semibold text-slate-900 leading-none mb-0.5">{chronicCount}</div>
+                      <h3 className="text-sm text-slate-600 mb-2">Chronic Issues</h3>
+                      {(() => {
+                        if (!prevStats) {
+                          return (
+                            <div className="flex items-center gap-1 text-xs font-semibold text-slate-500">
+                              <span>No prior period</span>
+                            </div>
+                          );
+                        }
+                        const delta = chronicCount - prevStats.chronicCount;
+                        const isWorsening = delta > 0;
+                        return delta !== 0 ? (
+                          <div className={`flex items-center gap-1 text-xs font-semibold ${isWorsening ? 'text-red-600' : 'text-green-600'}`}>
+                            {isWorsening ? <TrendingUp className="size-3" /> : <TrendingDown className="size-3" />}
+                            <span>{Math.abs(delta)} from {prevLabel}</span>
+                          </div>
+                        ) : (
                           <div className="flex items-center gap-1 text-xs font-semibold text-slate-500">
-                            <span>No prior period</span>
+                            <span>No change from {prevLabel}</span>
                           </div>
                         );
-                      }
-                      const delta = chronicCount - prevStats.chronicCount;
-                      const isWorsening = delta > 0;
-                      return delta !== 0 ? (
-                        <div className={`flex items-center gap-1 text-xs font-semibold ${isWorsening ? 'text-red-600' : 'text-green-600'}`}>
-                          {isWorsening ? <TrendingUp className="size-3" /> : <TrendingDown className="size-3" />}
-                          <span>{Math.abs(delta)} from {prevLabel}</span>
-                        </div>
-                      ) : (
-                        <div className="flex items-center gap-1 text-xs font-semibold text-slate-500">
-                          <span>No change from {prevLabel}</span>
-                        </div>
-                      );
-                    })()}
+                      })()}
+                    </div>
                   </div>
-                </div>
-              </Card>
+                </Card>
+              )}
             </div>
           </aside>
         </div>
