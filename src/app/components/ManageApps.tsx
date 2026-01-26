@@ -1,3 +1,5 @@
+// Admin app catalog management with KTLO/No-UX flags.
+// Loads app + metrics metadata from Supabase and allows bulk updates.
 import { useEffect, useMemo, useState } from 'react';
 import { Button } from './ui/button';
 import { Card } from './ui/card';
@@ -53,6 +55,7 @@ export function ManageApps({
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
 
+  // Local edits only; changes are persisted on save.
   const toggleFlag = (appId: string, flag: 'isKTLO' | 'noUX') => {
     setAppFlags(prev => ({
       ...prev,
@@ -64,6 +67,7 @@ export function ManageApps({
     setHasChanges(true);
   };
 
+  // Save only the apps whose flags differ from the initial load.
   const handleSave = () => {
     const changedAppIds = Object.keys(appFlags).filter((appId) => {
       const current = appFlags[appId];
@@ -116,6 +120,7 @@ export function ManageApps({
     };
 
     const loadApps = async () => {
+      // Load app list, latest metrics system, and theme counts for the table.
       setIsLoading(true);
       setLoadError(null);
 

@@ -1,3 +1,5 @@
+// Key journeys landing page: lists journeys with performance scores and trends.
+// Supports a feature-flagged placeholder while data wiring is in progress.
 import { ArrowLeft, FileDown, Construction } from 'lucide-react';
 import { Button } from './ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
@@ -35,6 +37,7 @@ export function AllJourneysView({
   isFeatureEnabled = true,
   showAdminButton,
 }: AllJourneysViewProps) {
+  // Feature flag gate to show a lightweight placeholder.
   if (!isFeatureEnabled) {
     return (
       <div className="min-h-screen bg-white">
@@ -86,7 +89,7 @@ export function AllJourneysView({
         <section className="mb-8">
           <h2 className="text-slate-900 mb-4">Journey Performance Table</h2>
           
-          {/* Desktop Table */}
+          {/* Desktop Table (mock data until real journey metrics are wired). */}
           <div className="hidden lg:block border border-slate-200 rounded-lg overflow-hidden">
             <table className="w-full">
               <thead className="bg-slate-100 border-b border-slate-200">

@@ -1,3 +1,5 @@
+// Portfolio overview landing page.
+// Loads period options + app metrics from Supabase and renders the core KPIs table.
 import React, { useEffect, useState } from 'react';
 import { ArrowLeft, FileDown, TrendingUp, TrendingDown, LayoutGrid, Route, Clock } from 'lucide-react';
 import { Button } from './ui/button';
@@ -210,6 +212,7 @@ export function PortfolioOverview({
       const buildQuery = (field: 'period' | 'period_label', value: string) =>
         supabase.from(viewName).select('*').eq(field, value).order('app_name', { ascending: true });
 
+      // Try multiple keys in order so a mislabeled period still resolves.
       const queryQueue: Array<{ field: 'period' | 'period_label'; value: string }> = [];
       // Try period code first (if available), then fall back to label match.
       if (timePeriod.format === 'year') {
@@ -334,6 +337,7 @@ export function PortfolioOverview({
 
   // Get formatted period label for display
 
+  // Aggregate metrics for the summary cards (derived from the selected period).
   // All summary cards and charts on this page use live data only.
   const periodApps = appMetrics ?? [];
   const hasApps = periodApps.length > 0;
@@ -393,6 +397,7 @@ export function PortfolioOverview({
     ? periodApps.reduce((min, app) => (app.scoreMoM < min.scoreMoM ? app : min))
     : null;
 
+  // Client-side sorting for the app table headers.
   const handleSort = (field: SortField) => {
     if (sortField === field) {
       setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
@@ -402,6 +407,7 @@ export function PortfolioOverview({
     }
   };
 
+  // Filtering + sorting is applied to the table list only (not summary cards).
   const tableApps = appMetrics ?? [];
   const filteredApps = tableApps.filter((app) => {
     if (filter === 'good') return app.overallScore >= 65;

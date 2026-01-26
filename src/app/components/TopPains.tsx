@@ -1,3 +1,5 @@
+// Top pains dashboard: aggregates feedback themes into prioritized pain points.
+// Mixes live Supabase data (when available) with a mock fallback dataset.
 import React, { useEffect, useMemo, useState } from 'react';
 import { ArrowLeft, FileDown, AlertTriangle, TrendingUp, TrendingDown, AlertCircle, Info, Link2, Clock, X, BarChart3, LineChart, Construction } from 'lucide-react';
 import { Button } from './ui/button';
@@ -708,6 +710,7 @@ export function TopPains({
     }
   };
 
+  // Aggregate raw observations into ranked pain points with severity/trend metadata.
   const buildPainPoints = (
     observations: ObservationRow[],
     normalizedThemes: NormalizedThemeRow[],
@@ -993,7 +996,7 @@ export function TopPains({
 
   const prevLabel = 'previous period';
 
-  // Filter data by scope (app)
+  // Filter data by scope (app) to support focused drill-downs.
   const scopedObservations = useMemo(() => {
     if (scopeFilter === 'all') return rawObservations;
     return rawObservations.filter((row) => row.app_name === scopeFilter);

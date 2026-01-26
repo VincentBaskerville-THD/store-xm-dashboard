@@ -1,3 +1,5 @@
+// Top-level navigation + page header for the non-admin dashboard views.
+// Drives navigation between primary pages and exposes optional Export/Admin actions.
 import React from 'react';
 import { Button } from './ui/button';
 import { FileDown } from 'lucide-react';
@@ -31,6 +33,7 @@ export function NavigationHeader({
   showExportButton = true,
   showAdminButton = true,
 }: NavigationHeaderProps) {
+  // Primary navigation tabs; `currentView` controls active styling.
   const navItems = [
     { id: 'home', label: 'Home', onClick: onNavigateHome },
     { id: 'all-apps', label: 'All Apps', onClick: onNavigateAllApps },
@@ -73,6 +76,7 @@ export function NavigationHeader({
             {subtitle && <p className="text-slate-300 mt-1 text-sm">{subtitle}</p>}
           </div>
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full lg:w-auto">
+            {/* Optional actions (export/admin) depend on the current page context. */}
             {showExportButton && (
               <Button
                 onClick={onNavigateExport}

@@ -1,3 +1,5 @@
+// Time period picker used across dashboard pages.
+// Supports month/quarter/year formats with optional overrides for available periods.
 import { Button } from './ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 
@@ -15,6 +17,7 @@ interface TimeSelectorProps {
   availablePeriods?: Partial<Record<TimeFormat, string[]>>;
 }
 
+// Default period lists when no external `availablePeriods` are supplied.
 const monthPeriods = [
   'December 2025', 'November 2025', 'October 2025', 'September 2025', 'August 2025', 'July 2025',
   'June 2025', 'May 2025', 'April 2025', 'March 2025', 'February 2025', 'January 2025',
@@ -33,6 +36,7 @@ const yearPeriods = ['2025', '2024', '2023', '2022', '2021'];
 export function TimeSelector({ value, onChange, variant = 'light', availablePeriods }: TimeSelectorProps) {
   const isDark = variant === 'dark';
   
+  // Resolve the list of periods for a given format, preferring injected data.
   const getPeriodOptions = (format: TimeFormat): string[] => {
     if (availablePeriods?.[format]?.length) return availablePeriods[format] ?? [];
     if (format === 'month') return monthPeriods;
@@ -40,6 +44,7 @@ export function TimeSelector({ value, onChange, variant = 'light', availablePeri
     return yearPeriods;
   };
 
+  // When switching formats, auto-select the first available period.
   const handleFormatChange = (newFormat: TimeFormat) => {
     const periods = getPeriodOptions(newFormat);
     // Default to the first period in the new format

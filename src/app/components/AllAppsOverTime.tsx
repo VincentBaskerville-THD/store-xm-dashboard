@@ -1,3 +1,5 @@
+// All-apps trend table: loads metrics from Supabase and renders sortable
+// monthly/quarterly score snapshots for each application.
 import { useEffect, useMemo, useState } from 'react';
 import { Button } from './ui/button';
 import { NavigationHeader } from './NavigationHeader';
@@ -78,6 +80,7 @@ export function AllAppsOverTime({
   const [metricsError, setMetricsError] = useState<string | null>(null);
   const [appMetricsRows, setAppMetricsRows] = useState<AppMetricsRow[]>([]);
 
+  // Parse a year token from period labels (calendar or FY-style).
   const getYearFromLabel = (label?: string | null) => {
     if (!label) return null;
     const calendarMatch = label.match(/\b(20\d{2})\b/);
@@ -92,6 +95,7 @@ export function AllAppsOverTime({
     return null;
   };
 
+  // Normalize period labels into a short key used for column headers.
   const getPeriodKey = (label: string | null, fallback: string, view: ViewGranularity) => {
     if (!label) {
       if (view === 'quarterly') {
@@ -188,6 +192,7 @@ export function AllAppsOverTime({
       .map(([key]) => key);
   }, [rowsForYear, granularity]);
 
+  // Pivot row-level metrics into per-app objects keyed by period.
   const appRows = useMemo(() => {
     const appMap = new Map<string, AppRow>();
     rowsForYear.forEach((row) => {

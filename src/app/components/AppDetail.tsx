@@ -1,3 +1,5 @@
+// App detail view with summary KPIs, trend charts, and theme highlights.
+// Currently driven by mock data until backend metrics are wired in.
 import { ArrowLeft, FileDown } from 'lucide-react';
 import { Button } from './ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
@@ -20,7 +22,7 @@ export function AppDetail({ appId, timePeriod, onTimePeriodChange, onNavigateBac
     return <div>App not found</div>;
   }
 
-  // Mock temporal data
+  // Mock temporal data (placeholder for time-series metrics).
   const temporalData = [
     { month: 'May', score: 72, easeOfUse: 3.6, usefulness: 3.8, responses: 198 },
     { month: 'Jun', score: 73, easeOfUse: 3.7, usefulness: 3.8, responses: 215 },
@@ -31,6 +33,7 @@ export function AppDetail({ appId, timePeriod, onTimePeriodChange, onNavigateBac
     { month: 'Nov', score: app.overallScore, easeOfUse: app.easeOfUse, usefulness: app.usefulness, responses: app.responses },
   ];
 
+  // Driver scores compared against a portfolio benchmark.
   const driverData = [
     { driver: 'Ease of Use', score: app.easeOfUse, portfolioAvg: 3.7 },
     { driver: 'Usefulness', score: app.usefulness, portfolioAvg: 3.9 },

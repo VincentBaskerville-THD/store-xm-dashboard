@@ -1,3 +1,5 @@
+// Enhanced journey detail page with interactive trend analysis and themes.
+// Uses mock data as placeholders until journey-level analytics are live.
 import { useState } from 'react';
 import { ArrowLeft, FileDown, ChevronLeft, ChevronRight, ExternalLink, ArrowRight, ArrowDown } from 'lucide-react';
 import { Button } from './ui/button';
@@ -53,7 +55,7 @@ export function JourneyDetailEnhanced({
     return <div>Journey not found</div>;
   }
 
-  // Quarterly data
+  // Quarterly data (mock trend for overall journey score).
   const quarterlyData = [
     { period: "Q1 '25", score: 48 },
     { period: "Q2 '25", score: 56 },
@@ -61,7 +63,7 @@ export function JourneyDetailEnhanced({
     { period: "Q4 '25", score: journey.overallScore },
   ];
 
-  // Monthly data
+  // Monthly data (mock trend for overall journey score).
   const monthlyData = [
     { period: 'Jan', score: 45 },
     { period: 'Feb', score: 47 },
@@ -127,7 +129,7 @@ export function JourneyDetailEnhanced({
   // Colorblind-friendly palette for multiple lines
   const lineColors = ['#0ea5e9', '#8b5cf6', '#10b981', '#f59e0b', '#ec4899', '#06b6d4', '#6366f1', '#f97316'];
 
-  // Get the appropriate data and keys based on view
+  // Get the appropriate data and keys based on view.
   const getTrendChartData = () => {
     if (trendView === 'by-app') {
       return timePeriod.format === 'quarter' ? quarterlyAppTrendData : monthlyAppTrendData;

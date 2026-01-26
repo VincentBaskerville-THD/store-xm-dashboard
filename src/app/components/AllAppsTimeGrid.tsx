@@ -1,3 +1,5 @@
+// All-apps time grid: interactive matrix of scores by period.
+// Uses mock data to illustrate filtering, drill-in details, and role-based views.
 import { useState } from 'react';
 import { ArrowLeft, FileDown, X, ChevronRight, ChevronLeft } from 'lucide-react';
 import { Button } from './ui/button';
@@ -47,7 +49,7 @@ export function AllAppsTimeGrid({ timePeriod, onTimePeriodChange, onNavigateBack
   const [cellDetailLevel, setCellDetailLevel] = useState<CellDetailLevel>('score-change');
   const [scoreFilter, setScoreFilter] = useState<'all' | 'good' | 'fair' | 'needs-improvement'>('all');
 
-  // Mock data generator for cells
+  // Mock data generator for cells (placeholder for future real metrics).
   const generateCellData = (appId: string, period: string): CellData => {
     const app = mockApps.find((a) => a.id === appId)!;
     const randomVariation = Math.floor(Math.random() * 10) - 5;
@@ -70,6 +72,7 @@ export function AllAppsTimeGrid({ timePeriod, onTimePeriodChange, onNavigateBack
     return months.slice(quarterIndex * 3, quarterIndex * 3 + 3);
   };
 
+  // Apply score filter in practitioner mode to keep the grid focused.
   const filteredApps = mockApps.filter((app) => {
     if (scoreFilter === 'good') return app.overallScore >= 65;
     if (scoreFilter === 'fair') return app.overallScore >= 50 && app.overallScore < 65;
@@ -77,6 +80,7 @@ export function AllAppsTimeGrid({ timePeriod, onTimePeriodChange, onNavigateBack
     return true;
   });
 
+  // Clicking a cell populates the right-side detail drawer.
   const handleCellClick = (appId: string, period: string) => {
     const cellData = generateCellData(appId, period);
     setSelectedCell(cellData);

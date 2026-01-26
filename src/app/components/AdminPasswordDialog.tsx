@@ -1,3 +1,5 @@
+// Admin access gate used before entering management pages.
+// Inputs: `open` controls dialog, `password` is expected value, callbacks notify success/close.
 import { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from './ui/dialog';
 import { Input } from './ui/input';
@@ -15,6 +17,7 @@ export function AdminPasswordDialog({ open, onClose, onSuccess, password: adminP
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
 
+  // Local-only check; no backend authentication is performed here.
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     

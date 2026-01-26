@@ -1,3 +1,5 @@
+// Export report builder for the dashboard.
+// Supports configurable sections (scores/journeys/pains) and time windows.
 import React, { useEffect, useRef, useState } from 'react';
 import { FileDown, ChevronDown, ChevronUp, Download } from 'lucide-react';
 import { Button } from './ui/button';
@@ -23,6 +25,7 @@ type ReportSection = 'scores' | 'journeys' | 'pains';
 type TimePeriod = 'monthly' | 'quarterly' | 'annual';
 type SortOrder = 'alphabetical' | 'score-desc' | 'score-asc' | 'trend';
 
+// User selections that drive what gets exported and how it is grouped.
 interface ExportConfig {
   sections: {
     scores: boolean;
@@ -109,6 +112,7 @@ type AppQuarterRow = {
   usefulness_topbox_pct?: number | null;
 };
 
+// Helpers for aligning fiscal periods and score trends across sections.
 const normalizeMetricsSystem = (value: string | null): 'pendo' | 'medallia' =>
   value?.toLowerCase().includes('medallia') ? 'medallia' : 'pendo';
 

@@ -1,3 +1,5 @@
+// Enhanced app detail view with live metrics, trend charts, and theme insights.
+// Pulls data from Supabase views and normalizes periods for the time selector.
 import React, { useEffect, useMemo, useState } from 'react';
 import { ArrowLeft, FileDown, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, AlertCircle } from 'lucide-react';
 import { Button } from './ui/button';
@@ -190,6 +192,7 @@ export function AppDetailEnhanced({
     let isMounted = true;
 
     const resolveThemesAppId = async () => {
+      // Map app name to the canonical id used by the themes tables.
       if (!appName) {
         setThemesAppId(null);
         return;
@@ -225,6 +228,7 @@ export function AppDetailEnhanced({
     return appSeries.find((row) => getLabel(row) === timePeriod.period) ?? appSeries[appSeries.length - 1];
   }, [appSeries, timePeriod.period]);
 
+  // Resolve the backend period code for the selected label (FY/quarter/month).
   const periodCodeToQuery = useMemo(() => {
     const label = timePeriod.period;
     const periodFromRow = currentPeriodData?.period;
@@ -289,6 +293,7 @@ export function AppDetailEnhanced({
     return { quarter, year };
   };
 
+  // Theme tables can require multiple period codes (e.g., full quarter/year windows).
   const periodCodesForThemes = useMemo(() => {
     if (timePeriod.format === 'month') {
       return periodCodeToQuery ? [periodCodeToQuery] : [];
@@ -532,6 +537,7 @@ export function AppDetailEnhanced({
       return p;
     });
 
+  // Collapse theme observations to the latest period per theme for summary cards.
   const feedbackThemes = useMemo<ThemeCategory[]>(() => {
     if (themeRows.length === 0) return [];
 

@@ -1,3 +1,5 @@
+// Admin journey editor with mock data for steps, trends, and metadata.
+// Provides CRUD-style controls plus visualization of journey performance.
 import { useState } from 'react';
 import { Card } from './ui/card';
 import { Button } from './ui/button';
@@ -31,7 +33,7 @@ interface JourneyStep {
   scoreCount?: number; // Number of UX-lite survey responses for this step
 }
 
-// Mock master list of steps from database - these are reusable across journeys
+// Mock master list of steps from database - these are reusable across journeys.
 const masterSteps = [
   { id: 'step_1', name: 'Initiate Return', appId: '1', appName: '1Returns', scoreCount: 324 },
   { id: 'step_2', name: 'Verify Eligibility', appId: '1', appName: '1Returns', scoreCount: 298 },
@@ -84,7 +86,7 @@ interface Journey {
   measuredEndDate?: string;
 }
 
-// Mock data - in production this would come from your database
+// Mock data - in production this would come from your database.
 const rawMockJourneys: Journey[] = [
   {
     id: '1',
@@ -190,6 +192,7 @@ const rawMockJourneys: Journey[] = [
   },
 ];
 
+// Apply mock markers to differentiate seeded content from real data.
 const mockJourneys: Journey[] = rawMockJourneys.map(journey => ({
   ...journey,
   name: markMock(journey.name),

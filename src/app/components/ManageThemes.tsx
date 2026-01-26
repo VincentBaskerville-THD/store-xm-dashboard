@@ -1,3 +1,5 @@
+// Admin theme management for per-app/per-period observations.
+// Loads observations from Supabase and supports grouped editing.
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Card } from './ui/card';
 import { Button } from './ui/button';
@@ -118,6 +120,7 @@ const toThemeId = (title: string) =>
     .replace(/[^\w]+/g, '_')
     .replace(/^_+|_+$/g, '');
 
+// Normalize raw rows from multiple sources into a unified editable shape.
 const mapObservationRow = (row: any): ThemeOccurrence => {
   const themeName = row.theme_title ?? row.theme_name ?? row.themes?.title ?? row.title ?? 'Untitled Theme';
   const themeId = row.theme_id ?? row.themeId ?? row.themeid ?? themeName;
@@ -156,7 +159,7 @@ const mapObservationRow = (row: any): ThemeOccurrence => {
   };
 };
 
-// Helper function to group occurrences by theme
+// Helper function to group occurrences by theme.
 function groupOccurrencesByTheme(occurrences: ThemeOccurrence[]): GroupedTheme[] {
   const grouped = new Map<string, GroupedTheme>();
   
@@ -1288,10 +1291,10 @@ export function ManageThemes({
   };
 
   const getStatusBadge = (status?: 'unresolved' | 'improving' | 'stabilized' | 'resolved-monitoring', type?: 'positive' | 'negative' | 'neutral') => {
-    if (type === 'positive') {
+    if (type === 'positive' || type === 'neutral') {
       return null;
     }
-    if (!status) return { label: 'Unresolved', color: 'text-red-800', bgColor: 'bg-red-100' };
+    if (!status) return null;
 
     switch (status) {
       case 'unresolved':

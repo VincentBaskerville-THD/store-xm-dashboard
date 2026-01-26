@@ -1,3 +1,5 @@
+// Admin tooling for normalizing and grouping top pains.
+// Loads themes/mappings/observations from Supabase and supports editing.
 import React, { useEffect, useMemo, useState } from 'react';
 import { Card } from './ui/card';
 import { Button } from './ui/button';
@@ -155,6 +157,7 @@ export function ManageTopPains({
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState('');
 
+  // Fetch normalized themes, source themes, mappings, and observations together.
   const loadData = async () => {
     const [
       { data: normalizedRows },

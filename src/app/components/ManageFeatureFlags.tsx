@@ -1,3 +1,5 @@
+// Admin-only feature flag toggles for gated pages.
+// Supports optional local-only overrides for development.
 import React from 'react';
 import { Flag } from 'lucide-react';
 import { Button } from './ui/button';
@@ -35,6 +37,7 @@ export function ManageFeatureFlags({
   useLocalOverrides,
   onUseLocalOverridesChange,
 }: ManageFeatureFlagsProps) {
+  // Reuse primary navigation to jump back to dashboard pages.
   const navItems = [
     { id: 'portfolio', label: 'Portfolio', onClick: onNavigateHome || onNavigateBack },
     { id: 'all-apps', label: 'All Apps', onClick: onNavigateAllApps || onNavigateBack },

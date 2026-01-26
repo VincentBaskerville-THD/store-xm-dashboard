@@ -1,3 +1,5 @@
+// Preview overlay for new/updated theme submissions.
+// Lets admins compare "new-only" vs "full-context" before saving.
 import { useState } from 'react';
 import { Card } from './ui/card';
 import { Button } from './ui/button';
@@ -45,6 +47,7 @@ export function AdminThemesPreview({
 }: AdminThemesPreviewProps) {
   const [previewMode, setPreviewMode] = useState<'new-only' | 'full-context'>('new-only');
   
+  // Switch between showing only new themes or merging with existing context.
   const displayThemes = previewMode === 'new-only' ? themes : [...themes, ...contextThemes];
 
   const getThemeColor = (type: 'positive' | 'negative' | 'neutral') => {
@@ -81,7 +84,7 @@ export function AdminThemesPreview({
     }
   };
 
-  // Calculate priority indicators for new themes only
+  // Calculate priority indicators for new themes only.
   const newChronicCount = themes.filter(t => t.type === 'negative' && (t.monthsActive ?? 0) >= 6).length;
   const newUnresolvedCount = themes.filter(t => t.type === 'negative' && (!t.status || t.status === 'unresolved')).length;
   const newUnresolvedCrossAppCount = themes.filter(t => t.type === 'negative' && (!t.status || t.status === 'unresolved') && (t.crossAppCount ?? 0) > 1).length;
@@ -153,7 +156,7 @@ export function AdminThemesPreview({
     );
   };
 
-  // Determine which metrics to show based on mode
+  // Determine which metric tiles to show based on preview mode.
   const showNewOnly = previewMode === 'new-only';
   const showFullContext = previewMode === 'full-context';
 

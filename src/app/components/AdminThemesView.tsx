@@ -1,3 +1,5 @@
+// Admin authoring surface for feedback themes (mock-driven).
+// Supports theme entry, preview, and lightweight validation before submission.
 import React, { useState, useEffect, useRef } from 'react';
 import { Card } from './ui/card';
 import { Button } from './ui/button';
@@ -133,13 +135,13 @@ export function AdminThemesView({
   const [showPreview, setShowPreview] = useState(false);
   const [previewMode, setPreviewMode] = useState<'new-only' | 'full-context'>('new-only');
   
-  // Theme search state - one per theme
+  // Theme search state - one per theme row (mocked search for suggestions).
   const [themeSearchQueries, setThemeSearchQueries] = useState<string[]>(['']);
   const [themeSearchResults, setThemeSearchResults] = useState<ExistingTheme[][]>([[]]);
   const [showThemeSearchDropdowns, setShowThemeSearchDropdowns] = useState<boolean[]>([false]);
   const themeSearchRefs = useRef<(HTMLDivElement | null)[]>([]);
 
-  // Close app dropdown when clicking outside
+  // Close app dropdowns when clicking outside the control.
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (appDropdownRef.current && !appDropdownRef.current.contains(event.target as Node)) {
@@ -162,7 +164,7 @@ export function AdminThemesView({
     };
   }, [showThemeSearchDropdowns]);
 
-  // Search existing themes with prioritization
+  // Search existing themes with prioritization for selected apps.
   const searchThemes = (query: string, themeIndex: number) => {
     if (query.trim() === '') {
       const newResults = [...themeSearchResults];

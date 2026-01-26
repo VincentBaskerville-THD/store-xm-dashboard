@@ -1,3 +1,5 @@
+// Admin settings page for dashboard/admin auth controls.
+// Validates passwords locally before updating shared settings.
 import React, { useState } from 'react';
 import { Button } from './ui/button';
 import { Card } from './ui/card';
@@ -62,6 +64,7 @@ export function ManageSettings({
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
+  // Validate and update the dashboard password in the parent state.
   const handleDashboardSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setDashboardError('');
@@ -97,6 +100,7 @@ export function ManageSettings({
     setTimeout(() => setDashboardSuccess(''), 5000);
   };
 
+  // Validate and update the admin password in the parent state.
   const handleAdminSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setError('');

@@ -1,3 +1,5 @@
+// Admin sub-navigation used across management pages.
+// Highlights current tab and emits tab changes to the parent container.
 import React from 'react';
 import { FileText, Database, Map, Settings, Lock, Flag } from 'lucide-react';
 
@@ -7,6 +9,7 @@ interface AdminTabNavProps {
 }
 
 export function AdminTabNav({ activeTab, onTabChange }: AdminTabNavProps) {
+  // Tab metadata drives labels and icons in the header.
   const tabs = [
     { id: 'manage-themes' as const, label: 'Manage Themes', icon: Database },
     { id: 'manage-top-pains' as const, label: 'Manage Top Pains', icon: FileText },

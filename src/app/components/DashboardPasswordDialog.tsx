@@ -1,3 +1,6 @@
+// Dashboard access gate: validates a shared password before letting users in.
+// Inputs: `open` to show dialog, `password` expected value, `onSuccess` callback.
+// Behavior: local-only check; does not persist credentials or call a backend.
 import React, { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from './ui/dialog';
 import { Input } from './ui/input';
@@ -18,6 +21,7 @@ export function DashboardPasswordDialog({
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
 
+  // Compare user input to the provided dashboard password and notify on success.
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 

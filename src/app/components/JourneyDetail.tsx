@@ -1,3 +1,5 @@
+// Journey detail view with trend analysis by overall/app/step.
+// Uses mock journey/app data to illustrate expected analytics layout.
 import { ArrowLeft, FileDown } from 'lucide-react';
 import { Button } from './ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
@@ -36,7 +38,7 @@ export function JourneyDetail({ journeyId, timePeriod, onTimePeriodChange, onNav
     { month: 'Nov', score: journey.overallScore },
   ];
 
-  // Mock data for app-level trends
+  // Mock data for app-level trends (multiple lines + overall baseline).
   const appTrendData = [
     { month: 'May', overall: journey.overallScore - 6, '1Returns': 74, 'Inventory Manager': 67, 'Order Up': 65, 'Customer Portal': 62 },
     { month: 'Jun', overall: journey.overallScore - 4, '1Returns': 76, 'Inventory Manager': 69, 'Order Up': 66, 'Customer Portal': 64 },
@@ -47,7 +49,7 @@ export function JourneyDetail({ journeyId, timePeriod, onTimePeriodChange, onNav
     { month: 'Nov', overall: journey.overallScore, '1Returns': 81, 'Inventory Manager': 75, 'Order Up': 70, 'Customer Portal': 70 },
   ];
 
-  // Mock data for step-level trends
+  // Mock data for step-level trends (touchpoint view).
   const stepTrendData = [
     { month: 'May', overall: journey.overallScore - 6, 'Initiate Return': 78, 'Verify Product': 71, 'Process Refund': 65, 'Update Customer Record': 62, 'Generate Return Label': 75, 'Confirm Receipt': 72 },
     { month: 'Jun', overall: journey.overallScore - 4, 'Initiate Return': 79, 'Verify Product': 72, 'Process Refund': 67, 'Update Customer Record': 64, 'Generate Return Label': 76, 'Confirm Receipt': 73 },
@@ -62,7 +64,7 @@ export function JourneyDetail({ journeyId, timePeriod, onTimePeriodChange, onNav
   const appColors = ['#ea580c', '#0ea5e9', '#8b5cf6', '#10b981', '#f59e0b', '#ec4899', '#06b6d4', '#6366f1'];
   const stepColors = ['#ea580c', '#0ea5e9', '#8b5cf6', '#10b981', '#f59e0b', '#ec4899', '#06b6d4', '#6366f1'];
 
-  // Get the appropriate data and keys based on view
+  // Switch chart data and legend keys based on the current trend view.
   const getChartData = () => {
     if (trendView === 'by-app') return appTrendData;
     if (trendView === 'by-step') return stepTrendData;

@@ -1,3 +1,5 @@
+// Feedback theme summary component shared by multiple pages.
+// Provides density modes, narrative summaries, and metadata badges.
 import React from 'react';
 import { AlertCircle } from 'lucide-react';
 import { Card } from './ui/card';
@@ -68,7 +70,7 @@ const getStatusBadge = (status?: 'unresolved' | 'improving' | 'stabilized' | 're
   }
 };
 
-// Helper: Generate narrative summary for the period
+// Helper: Generate narrative summary for the period (used in standard density).
 const generateNarrativeSummary = (themes: ThemeCategory[]): string => {
   const chronicIssues = themes.filter(t => t.type === 'negative' && (t.metadata?.monthsActive ?? 0) >= 6);
   const unresolvedIssues = themes.filter(t => t.type === 'negative' && t.metadata?.status === 'unresolved');
@@ -166,7 +168,7 @@ export function ScoreDriversThemes({
     );
   }
 
-  // Standard version - narratives visible, comments collapsed
+  // Standard version - narratives visible, comments collapsed.
   if (density === 'standard') {
     const narrativeSummary = generateNarrativeSummary(themes);
     const chronicCount = themes.filter(t => t.type === 'negative' && (t.metadata?.monthsActive ?? 0) >= 6).length;

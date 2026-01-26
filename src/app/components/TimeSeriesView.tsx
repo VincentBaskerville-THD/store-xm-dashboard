@@ -1,3 +1,5 @@
+// Portfolio time-series view with monthly/quarterly/yearly trends.
+// Data is mocked for now to illustrate expected charts and comparisons.
 import { ArrowLeft, FileDown } from 'lucide-react';
 import { Button } from './ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
@@ -12,6 +14,7 @@ interface TimeSeriesViewProps {
 }
 
 export function TimeSeriesView({ timePeriod, onTimePeriodChange, onNavigateBack }: TimeSeriesViewProps) {
+  // Month-level series used by charts and period-over-period table.
   const monthlyData = [
     { period: 'May 2025', portfolioScore: 68, goodApps: 6, fairApps: 7, needsImprovementApps: 3 },
     { period: 'Jun 2025', portfolioScore: 69, goodApps: 7, fairApps: 6, needsImprovementApps: 3 },
@@ -157,7 +160,7 @@ export function TimeSeriesView({ timePeriod, onTimePeriodChange, onNavigateBack 
           </Card>
         </section>
 
-        {/* Period Comparison Table */}
+        {/* Period Comparison Table (derived from monthly series). */}
         <section className="mb-8">
           <h2 className="text-slate-900 mb-4">Period-over-Period Comparison</h2>
           <div className="border border-slate-200 rounded-lg overflow-hidden">
