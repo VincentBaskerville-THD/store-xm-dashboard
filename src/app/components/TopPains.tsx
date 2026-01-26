@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { ArrowLeft, FileDown, AlertTriangle, TrendingUp, TrendingDown, AlertCircle, Info, Link2, Clock, X, BarChart3, LineChart, Construction } from 'lucide-react';
 import { Button } from './ui/button';
 import { Card } from './ui/card';
@@ -677,6 +677,9 @@ export function TopPains({
   const [detailPanelOpen, setDetailPanelOpen] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [painData, setPainData] = useState<PainPoint[]>([]);
+  const [rawObservations, setRawObservations] = useState<ObservationRow[]>([]);
+  const [normalizedThemes, setNormalizedThemes] = useState<NormalizedThemeRow[]>([]);
+  const [themeMappings, setThemeMappings] = useState<ThemeMappingRow[]>([]);
   const [availableApps, setAvailableApps] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -719,6 +722,8 @@ export function TopPains({
         trendCounts: Record<string, number>;
         monthsTotals: number;
         periodSet: Set<string>;
+        latestPeriodSort: number | null;
+        latestStatusCounts: Record<string, number>;
         percentageTotal: number;
         statusWeightedMentions: number;
         hasMentionsData: boolean;
@@ -750,6 +755,8 @@ export function TopPains({
           trendCounts: { increasing: 0, decreasing: 0, stable: 0 },
           monthsTotals: 0,
           periodSet: new Set<string>(),
+          latestPeriodSort: null,
+          latestStatusCounts: { unresolved: 0, improving: 0, stabilized: 0, resolved: 0 },
           percentageTotal: 0,
           statusWeightedMentions: 0,
           hasMentionsData: false,
@@ -758,6 +765,8 @@ export function TopPains({
 
       const group = grouped.get(normalized.key)!;
       const severity = (row.severity ?? 'low') as 'high' | 'medium' | 'low';
+      const rowStatus = row.status ?? undefined;
+      const rowSort = row.sort_order ?? null;
       if (row.mentions_count !== null && row.mentions_count !== undefined) {
         group.hasMentionsData = true;
         group.totalMentions += row.mentions_count;
@@ -777,6 +786,21 @@ export function TopPains({
       const trend = row.trend_direction ?? 'stable';
       if (trend === 'increasing' || trend === 'decreasing' || trend === 'stable') {
         group.trendCounts[trend] += 1;
+      }
+
+      if (rowSort !== null) {
+        if (group.latestPeriodSort === null || rowSort > group.latestPeriodSort) {
+          group.latestPeriodSort = rowSort;
+          group.latestStatusCounts = { unresolved: 0, improving: 0, stabilized: 0, resolved: 0 };
+        }
+        if (rowSort === group.latestPeriodSort) {
+          if (rowStatus === 'unresolved') group.latestStatusCounts.unresolved += 1;
+          if (rowStatus === 'improving') group.latestStatusCounts.improving += 1;
+          if (rowStatus === 'stabilized') group.latestStatusCounts.stabilized += 1;
+          if (rowStatus === 'resolved' || rowStatus === 'resolved_monitoring') {
+            group.latestStatusCounts.resolved += 1;
+          }
+        }
       }
     });
 
@@ -814,8 +838,22 @@ export function TopPains({
       const severityMultiplier = group.severity === 'high' ? 3 : group.severity === 'medium' ? 2 : 1;
       const trendMultiplier =
         group.trendDirection === 'increasing' ? 1.2 : group.trendDirection === 'decreasing' ? 0.8 : 1;
+      let latestStatusMultiplier = 1;
+      if (group.latestStatusCounts.unresolved > 0) {
+        latestStatusMultiplier = 1;
+      } else if (group.latestStatusCounts.improving > 0) {
+        latestStatusMultiplier = 0.85;
+      } else if (group.latestStatusCounts.stabilized > 0) {
+        latestStatusMultiplier = 0.6;
+      } else if (group.latestStatusCounts.resolved > 0) {
+        latestStatusMultiplier = 0.3;
+      }
       group.impactScore =
-        group.statusWeightedMentions * severityMultiplier * trendMultiplier * Math.max(uniqueApps.length, 1);
+        group.statusWeightedMentions
+        * severityMultiplier
+        * trendMultiplier
+        * Math.max(uniqueApps.length, 1)
+        * latestStatusMultiplier;
 
       pains.push({
         ...group,
@@ -901,22 +939,28 @@ export function TopPains({
         return;
       }
 
+      const resolvedObservations = (observations ?? []) as ObservationRow[];
+      const resolvedNormalizedThemes = (normalizedRows ?? []) as NormalizedThemeRow[];
+      const resolvedMappings = (mappingRows ?? []) as ThemeMappingRow[];
       const pains = buildPainPoints(
-        (observations ?? []) as ObservationRow[],
-        (normalizedRows ?? []) as NormalizedThemeRow[],
-        (mappingRows ?? []) as ThemeMappingRow[],
+        resolvedObservations,
+        resolvedNormalizedThemes,
+        resolvedMappings,
       );
 
       if (!isMounted) return;
 
       setPainData(pains);
+      setRawObservations(resolvedObservations);
+      setNormalizedThemes(resolvedNormalizedThemes);
+      setThemeMappings(resolvedMappings);
       const apps = Array.from(
         new Set((observations ?? []).map((row) => row.app_name).filter(Boolean)),
       ) as string[];
       setAvailableApps(apps.sort((a, b) => a.localeCompare(b)));
 
       const periodMap = new Map<string, { period: string; label: string; sort_order: number }>();
-      (observations ?? []).forEach((row) => {
+      resolvedObservations.forEach((row) => {
         if (!row.period || row.sort_order === null || row.sort_order === undefined) return;
         const label = row.period_label ?? row.period;
         if (!periodMap.has(row.period)) {
@@ -931,9 +975,9 @@ export function TopPains({
       setDataMonthsCount(periodMap.size);
       setSeriesByThemeKey(
         buildRecentSeries(
-          (observations ?? []) as ObservationRow[],
-          (normalizedRows ?? []) as NormalizedThemeRow[],
-          (mappingRows ?? []) as ThemeMappingRow[],
+          resolvedObservations,
+          resolvedNormalizedThemes,
+          resolvedMappings,
           recent,
         ),
       );
@@ -947,25 +991,81 @@ export function TopPains({
     };
   }, [timePeriod.period, timePeriod.format]);
 
-  const filterByScope = (pains: PainPoint[]) => {
-    if (scopeFilter === 'all') return pains;
-    return pains.filter((pain) => pain.affectedApps.includes(scopeFilter));
-  };
-
   const prevLabel = 'previous period';
 
   // Filter data by scope (app)
-  const getScopedPainData = (): PainPoint[] => {
-    return filterByScope(painData);
+  const scopedObservations = useMemo(() => {
+    if (scopeFilter === 'all') return rawObservations;
+    return rawObservations.filter((row) => row.app_name === scopeFilter);
+  }, [rawObservations, scopeFilter]);
+
+  const scopedPainData = useMemo(() => {
+    if (scopeFilter === 'all') return painData;
+    return buildPainPoints(scopedObservations, normalizedThemes, themeMappings);
+  }, [painData, scopeFilter, scopedObservations, normalizedThemes, themeMappings]);
+
+  const scopedPeriods = useMemo(() => {
+    const periodMap = new Map<string, { period: string; label: string; sort_order: number }>();
+    scopedObservations.forEach((row) => {
+      if (!row.period || row.sort_order === null || row.sort_order === undefined) return;
+      const label = row.period_label ?? row.period;
+      if (!periodMap.has(row.period)) {
+        periodMap.set(row.period, { period: row.period, label, sort_order: row.sort_order });
+      }
+    });
+    return Array.from(periodMap.values()).sort((a, b) => a.sort_order - b.sort_order);
+  }, [scopedObservations]);
+
+  const scopedRecentPeriods = useMemo(() => {
+    return scopedPeriods.slice(-3).map((row) => ({ period: row.period, label: row.label }));
+  }, [scopedPeriods]);
+
+  const scopedSeriesByThemeKey = useMemo(() => {
+    if (scopeFilter === 'all') return seriesByThemeKey;
+    return buildRecentSeries(scopedObservations, normalizedThemes, themeMappings, scopedRecentPeriods);
+  }, [scopeFilter, seriesByThemeKey, scopedObservations, normalizedThemes, themeMappings, scopedRecentPeriods]);
+
+  const scopedDataMonthsCount = scopeFilter === 'all' ? dataMonthsCount : scopedPeriods.length;
+
+  const selectedPainTimeSeries = useMemo(() => {
+    if (!selectedPainForDetail) return [];
+    const periodMap = new Map<string, { period: string; label: string; sort_order: number }>();
+    scopedObservations.forEach((row) => {
+      if (!row.period || row.sort_order === null || row.sort_order === undefined) return;
+      const label = row.period_label ?? row.period;
+      if (!periodMap.has(row.period)) {
+        periodMap.set(row.period, { period: row.period, label, sort_order: row.sort_order });
+      }
+    });
+    const periods = Array.from(periodMap.values()).sort((a, b) => a.sort_order - b.sort_order);
+    const allSeries = buildRecentSeries(
+      scopedObservations,
+      normalizedThemes,
+      themeMappings,
+      periods.map((row) => ({ period: row.period, label: row.label })),
+    );
+    const values = allSeries[selectedPainForDetail.id] ?? [];
+    return periods.map((period, index) => ({
+      label: period.label,
+      value: values[index] ?? 0,
+    }));
+  }, [normalizedThemes, scopedObservations, selectedPainForDetail, themeMappings]);
+
+  const getImpactScoreForScope = (pain: PainPoint) => {
+    if (scopeFilter === 'all') return pain.impactScore;
+    const divisor = Math.max(pain.affectedApps.length, 1);
+    return pain.impactScore / divisor;
   };
 
   // Sort by impact score
   const getDisplayedPains = () => {
-    let pains = getScopedPainData();
+    let pains = scopedPainData;
     
     pains.sort((a, b) => {
-      if (b.impactScore !== a.impactScore) {
-        return b.impactScore - a.impactScore;
+      const aScore = getImpactScoreForScope(a);
+      const bScore = getImpactScoreForScope(b);
+      if (bScore !== aScore) {
+        return bScore - aScore;
       }
       return b.totalMentions - a.totalMentions;
     });
@@ -976,18 +1076,17 @@ export function TopPains({
   const displayedPains = getDisplayedPains();
   const top10Pains = displayedPains.slice(0, 10);
   const top5Pains = displayedPains.slice(0, 5);
-  const trendValues = top5Pains.flatMap((pain) => seriesByThemeKey[pain.id] ?? []);
+  const trendValues = top5Pains.flatMap((pain) => scopedSeriesByThemeKey[pain.id] ?? []);
   const maxTrendValue = trendValues.length > 0 ? Math.max(...trendValues) : 1;
   // Calculate summary statistics based on scoped data
-  const scopedData = getScopedPainData();
-  const summaryStats = computeSummary(scopedData);
+  const summaryStats = computeSummary(scopedPainData);
   const highSeverityCount = summaryStats.highSeverityCount;
   const crossAppPainsCount = summaryStats.crossAppPainsCount;
   const avgMonthsActive = summaryStats.avgMonthsActive;
   const avgMonthsActiveDisplay = avgMonthsActive.toFixed(1);
   const chronicCount = summaryStats.chronicCount;
 
-  const trendLabels = recentPeriods.map((period) => period.label);
+  const trendLabels = scopedRecentPeriods.map((period) => period.label);
   const lineColors = ['#2563eb', '#10b981', '#f97316', '#a855f7', '#0ea5e9'];
 
   const handlePainClick = (pain: PainPoint) => {
@@ -1026,7 +1125,7 @@ export function TopPains({
           <div className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1 text-sm text-slate-600">
             <span className="font-semibold text-slate-800">All time</span>
             <span className="text-slate-500">
-              Top pains across {dataMonthsCount} months of data
+              Top pains across {scopedDataMonthsCount} months of data
             </span>
           </div>
         </div>
@@ -1132,19 +1231,22 @@ export function TopPains({
                           Ranking logic
                         </button>
                       </TooltipTrigger>
-                      <TooltipContent
-                        side="bottom"
-                        className="w-max max-w-none whitespace-nowrap text-xs leading-relaxed"
-                      >
-                        <div className="whitespace-nowrap">
-                          impact = mentions × status × severity × trend × affected apps
-                        </div>
-                        <div className="whitespace-nowrap">
-                          status: unresolved 1.0, improving 0.85, stabilized 0.6, resolved 0.3
-                        </div>
-                        <div className="whitespace-nowrap">severity: high 3, medium 2, low 1</div>
-                        <div className="whitespace-nowrap">trend: increasing 1.2, stable 1.0, decreasing 0.8</div>
-                      </TooltipContent>
+                    <TooltipContent
+                      side="bottom"
+                      className="w-max max-w-none whitespace-nowrap text-xs leading-relaxed"
+                    >
+                      <div className="whitespace-nowrap">
+                        impact = mentions × status × severity × trend{scopeFilter === 'all' ? ' × affected apps' : ''}
+                      </div>
+                      <div className="whitespace-nowrap">
+                        status: unresolved 1.0, improving 0.85, stabilized 0.6, resolved 0.3
+                      </div>
+                      <div className="whitespace-nowrap">
+                        latest period decay: unresolved 1.0, improving 0.85, stabilized 0.6, resolved 0.3
+                      </div>
+                      <div className="whitespace-nowrap">severity: high 3, medium 2, low 1</div>
+                      <div className="whitespace-nowrap">trend: increasing 1.2, stable 1.0, decreasing 0.8</div>
+                    </TooltipContent>
                     </Tooltip>
                   </div>
                   
@@ -1173,9 +1275,11 @@ export function TopPains({
                             <span className="text-sm font-semibold text-slate-900 flex-1 truncate group-hover:text-slate-700">
                               {pain.title}
                             </span>
-                            <span className="text-xs font-semibold text-slate-600 bg-slate-100 px-2 py-0.5 rounded">
-                              {pain.affectedApps.length} {pain.affectedApps.length === 1 ? 'app' : 'apps'}
-                            </span>
+                            {scopeFilter === 'all' && (
+                              <span className="text-xs font-semibold text-slate-600 bg-slate-100 px-2 py-0.5 rounded">
+                                {pain.affectedApps.length} {pain.affectedApps.length === 1 ? 'app' : 'apps'}
+                              </span>
+                            )}
                           </div>
                           <div className="ml-8 relative">
                             <div className="h-7 bg-slate-100 rounded overflow-hidden">
@@ -1247,7 +1351,7 @@ export function TopPains({
                         
                         {/* Lines for each pain point */}
                         {top5Pains.map((pain, painIndex) => {
-                          const values = seriesByThemeKey[pain.id] ?? [];
+                          const values = scopedSeriesByThemeKey[pain.id] ?? [];
                           const color = lineColors[painIndex % lineColors.length];
                           const count = values.length;
                           const points = values.map((value, i) => {
@@ -1399,7 +1503,7 @@ export function TopPains({
                           {severityLabel}
                         </span>
                         
-                        {pain.affectedApps.length > 1 && (
+                        {scopeFilter === 'all' && pain.affectedApps.length > 1 && (
                           <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-white border border-slate-300 text-slate-700 text-xs font-semibold">
                             <Link2 className="size-3" />
                             {pain.affectedApps.length} apps
@@ -1430,10 +1534,12 @@ export function TopPains({
 
                       <p className="text-slate-700 mb-3">{pain.description}</p>
 
-                      <div className="flex flex-col sm:flex-row sm:items-center gap-1">
-                        <span className="text-slate-600 font-semibold">Affected Apps:</span>
-                        <span className="text-slate-700">{pain.affectedApps.join(', ')}</span>
-                      </div>
+                      {scopeFilter === 'all' && (
+                        <div className="flex flex-col sm:flex-row sm:items-center gap-1">
+                          <span className="text-slate-600 font-semibold">Affected Apps:</span>
+                          <span className="text-slate-700">{pain.affectedApps.join(', ')}</span>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </Card>
@@ -1763,11 +1869,7 @@ export function TopPains({
                     {/* Y-axis labels */}
                     <div className="absolute left-0 top-0 bottom-8 w-12 pr-2 flex flex-col justify-between text-xs text-slate-600 text-right">
                       {[0, 1, 2, 3, 4].reverse().map((i) => {
-                        const trendData = (seriesByThemeKey[selectedPainForDetail.id] ?? []).map((value, index) => ({
-                          label: trendLabels[index] ?? '',
-                          value,
-                        }));
-                        const maxValue = Math.max(...trendData.map(d => d.value));
+                        const maxValue = Math.max(1, ...selectedPainTimeSeries.map(d => d.value));
                         const value = Math.round((maxValue / 4) * i);
                         return <span key={i}>{value}</span>;
                       })}
@@ -1791,17 +1893,14 @@ export function TopPains({
                         
                         {/* Line */}
                         {(() => {
-                          const trendData = (seriesByThemeKey[selectedPainForDetail.id] ?? []).map((value, index) => ({
-                            label: trendLabels[index] ?? '',
-                            value,
-                          }));
-                          const maxValue = Math.max(...trendData.map(d => d.value));
+                          const trendData = selectedPainTimeSeries;
+                          const maxValue = Math.max(1, ...trendData.map(d => d.value));
                           const color = selectedPainForDetail.severity === 'high' ? '#dc2626' : 
                                        selectedPainForDetail.severity === 'medium' ? '#ea580c' : 
                                        '#ca8a04';
                           
                           const points = trendData.map((d, i) => {
-                            const x = (i / (trendData.length - 1)) * 400;
+                            const x = trendData.length === 1 ? 200 : (i / (trendData.length - 1)) * 400;
                             const y = 18 + (100 - ((d.value / maxValue) * 100));
                             return `${x},${y}`;
                           }).join(' ');
@@ -1816,7 +1915,7 @@ export function TopPains({
                               />
                               {/* Data points */}
                               {trendData.map((d, i) => {
-                                const x = (i / (trendData.length - 1)) * 400;
+                                const x = trendData.length === 1 ? 200 : (i / (trendData.length - 1)) * 400;
                                 const y = 18 + (100 - ((d.value / maxValue) * 100));
                                 return (
                                   <g key={i}>
@@ -1845,10 +1944,7 @@ export function TopPains({
                       
                       {/* X-axis labels */}
                       <div className="flex justify-between px-1 mt-2 text-xs text-slate-600">
-                        {(seriesByThemeKey[selectedPainForDetail.id] ?? []).map((value, index) => ({
-                          label: trendLabels[index] ?? '',
-                          value,
-                        })).map((segment, i) => (
+                        {selectedPainTimeSeries.map((segment, i) => (
                           <span key={i} className="text-center">{segment.label}</span>
                         ))}
                       </div>
