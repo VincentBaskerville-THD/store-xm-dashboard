@@ -718,6 +718,7 @@ export function TopPains({
         severityCounts: Record<string, number>;
         trendCounts: Record<string, number>;
         monthsTotals: number;
+        periodSet: Set<string>;
         percentageTotal: number;
         statusWeightedMentions: number;
         hasMentionsData: boolean;
@@ -748,6 +749,7 @@ export function TopPains({
           severityCounts: { high: 0, medium: 0, low: 0 },
           trendCounts: { increasing: 0, decreasing: 0, stable: 0 },
           monthsTotals: 0,
+          periodSet: new Set<string>(),
           percentageTotal: 0,
           statusWeightedMentions: 0,
           hasMentionsData: false,
@@ -768,6 +770,9 @@ export function TopPains({
       }
       group.affectedApps.push(row.app_name ?? row.app_id ?? 'Unknown');
       group.monthsTotals += row.months_active ?? 0;
+      if (row.period) {
+        group.periodSet.add(row.period);
+      }
       group.severityCounts[severity] += 1;
       const trend = row.trend_direction ?? 'stable';
       if (trend === 'increasing' || trend === 'decreasing' || trend === 'stable') {
@@ -780,8 +785,12 @@ export function TopPains({
       const uniqueApps = Array.from(new Set(group.affectedApps));
       const totalMappings = group.severityCounts.high + group.severityCounts.medium + group.severityCounts.low;
       group.percentage = totalMappings > 0 ? group.percentageTotal / totalMappings : 0;
-      group.monthsActive =
-        totalMappings > 0 ? Math.max(1, Math.round(group.monthsTotals / totalMappings)) : 0;
+      if (group.periodSet.size > 0) {
+        group.monthsActive = group.periodSet.size;
+      } else {
+        group.monthsActive =
+          totalMappings > 0 ? Math.max(1, Math.round(group.monthsTotals / totalMappings)) : 0;
+      }
       if (!group.hasMentionsData) {
         group.totalMentions = group.percentageTotal;
       }

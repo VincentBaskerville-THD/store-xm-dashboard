@@ -4,7 +4,7 @@ import { Card } from './ui/card';
 
 export type ThemeCategory = {
   title: string;
-  percentage: number;
+  percentage: number | null;
   type: 'positive' | 'negative' | 'neutral';
   narratives: string[];
   exampleComments?: Comment[];
@@ -34,6 +34,7 @@ interface ScoreDriversThemesProps {
   density?: DensityLevel;
   title?: string;
   subtitle?: string;
+  hideThemeCards?: boolean;
 }
 
 // Helper: Derive persistence classification from monthsActive (matches ManageThemes)
@@ -46,14 +47,11 @@ const getPersistenceLabel = (monthsActive?: number): { label: string } => {
 
 // Helper: Get status badge styling (matches ManageThemes)
 const getStatusBadge = (status?: 'unresolved' | 'improving' | 'stabilized' | 'resolved-monitoring', type?: 'positive' | 'negative' | 'neutral') => {
-  // For positive themes, default to "Stabilized"
-  if (type === 'positive' && !status) {
-    return { label: 'Stabilized', color: 'text-green-800', bgColor: 'bg-green-100' };
+  if (type === 'positive' || type === 'neutral') {
+    return null;
   }
-  
-  // For negative themes, default to "Unresolved"
   if (!status) {
-    return { label: 'Unresolved', color: 'text-red-800', bgColor: 'bg-red-100' };
+    return null;
   }
   
   switch (status) {
@@ -73,16 +71,17 @@ const getStatusBadge = (status?: 'unresolved' | 'improving' | 'stabilized' | 're
 // Helper: Generate narrative summary for the period
 const generateNarrativeSummary = (themes: ThemeCategory[]): string => {
   const chronicIssues = themes.filter(t => t.type === 'negative' && (t.metadata?.monthsActive ?? 0) >= 6);
-  const unresolvedIssues = themes.filter(t => t.type === 'negative' && (!t.metadata?.status || t.metadata.status === 'unresolved'));
+  const unresolvedIssues = themes.filter(t => t.type === 'negative' && t.metadata?.status === 'unresolved');
   
   if (chronicIssues.length > 0) {
     const topChronic = chronicIssues[0];
     const persistenceMonths = topChronic.metadata?.monthsActive || 0;
-    return `${chronicIssues.length} chronic issue${chronicIssues.length > 1 ? 's' : ''} remain${chronicIssues.length === 1 ? 's' : ''} unresolved this period, with "${topChronic.title}" persisting for ${persistenceMonths} consecutive months and representing ${topChronic.percentage}% of feedback. These long-standing pain points require immediate prioritization.`;
+    const chronicPercent = topChronic.percentage ?? 0;
+    return `${chronicIssues.length} chronic issue${chronicIssues.length > 1 ? 's' : ''} remain${chronicIssues.length === 1 ? 's' : ''} unresolved this period, with "${topChronic.title}" persisting for ${persistenceMonths} consecutive months and representing ${chronicPercent}% of feedback. These long-standing pain points require immediate prioritization.`;
   }
   
   if (unresolvedIssues.length > 0) {
-    const totalUnresolvedPercentage = unresolvedIssues.reduce((sum, t) => sum + t.percentage, 0);
+    const totalUnresolvedPercentage = unresolvedIssues.reduce((sum, t) => sum + (t.percentage ?? 0), 0);
     return `${unresolvedIssues.length} unresolved issue${unresolvedIssues.length > 1 ? 's' : ''} dominate this period's feedback (${totalUnresolvedPercentage}% combined), indicating persistent pain points that need attention to prevent them from becoming chronic concerns.`;
   }
   
@@ -93,7 +92,8 @@ export function ScoreDriversThemes({
   themes, 
   density = 'standard',
   title = 'Feedback Themes',
-  subtitle = 'AI Supported Summary'
+  subtitle = 'AI Supported Summary',
+  hideThemeCards = false,
 }: ScoreDriversThemesProps) {
 
   const getThemeColor = (type: 'positive' | 'negative' | 'neutral') => {
@@ -132,11 +132,17 @@ export function ScoreDriversThemes({
             🔗 {metadata.crossAppCount} apps
           </span>
         )}
-        {metadata.status && (
-          <span className={`inline-flex items-center px-2 py-0.5 rounded ${getStatusBadge(metadata.status, themeType).bgColor} ${getStatusBadge(metadata.status, themeType).color} text-xs font-semibold`}>
-            {getStatusBadge(metadata.status, themeType).label}
-          </span>
-        )}
+        {(() => {
+          const statusBadge = getStatusBadge(metadata.status, themeType);
+          if (!statusBadge) return null;
+          return (
+            <span
+              className={`inline-flex items-center px-2 py-0.5 rounded ${statusBadge.bgColor} ${statusBadge.color} text-xs font-semibold`}
+            >
+              {statusBadge.label}
+            </span>
+          );
+        })()}
       </div>
     );
   };
@@ -147,10 +153,11 @@ export function ScoreDriversThemes({
       <div className="space-y-2">
         {themes.map((theme, index) => {
           const colors = getThemeColor(theme.type);
+          const percentageLabel = theme.percentage !== null ? ` (${theme.percentage}%)` : '';
           return (
             <div key={index} className={`px-3 py-2 rounded border ${colors.border} ${colors.bg}`}>
               <span className={`font-semibold ${colors.text}`}>
-                {colors.icon} {theme.title} ({theme.percentage}%)
+                {colors.icon} {theme.title}{percentageLabel}
               </span>
             </div>
           );
@@ -163,9 +170,11 @@ export function ScoreDriversThemes({
   if (density === 'standard') {
     const narrativeSummary = generateNarrativeSummary(themes);
     const chronicCount = themes.filter(t => t.type === 'negative' && (t.metadata?.monthsActive ?? 0) >= 6).length;
-    const unresolvedCount = themes.filter(t => t.type === 'negative' && (!t.metadata?.status || t.metadata.status === 'unresolved')).length;
-    const unresolvedCrossAppCount = themes.filter(t => t.type === 'negative' && (!t.metadata?.status || t.metadata.status === 'unresolved') && (t.metadata?.crossAppCount ?? 0) > 1).length;
-    const persistentFeedbackPercent = themes.filter(t => t.type === 'negative' && (t.metadata?.monthsActive ?? 0) >= 3).reduce((sum, t) => sum + t.percentage, 0);
+    const unresolvedCount = themes.filter(t => t.type === 'negative' && t.metadata?.status === 'unresolved').length;
+    const unresolvedCrossAppCount = themes.filter(t => t.type === 'negative' && t.metadata?.status === 'unresolved' && (t.metadata?.crossAppCount ?? 0) > 1).length;
+    const persistentFeedbackPercent = themes
+      .filter(t => t.type === 'negative' && (t.metadata?.monthsActive ?? 0) >= 3)
+      .reduce((sum, t) => sum + (t.percentage ?? 0), 0);
 
     return (
       <div>
@@ -273,8 +282,9 @@ export function ScoreDriversThemes({
           </div>
 
           {/* Left Column - Theme Cards (appears second on mobile) */}
-          <div className="lg:col-span-8 lg:order-1 grid grid-cols-1 md:grid-cols-2 gap-4">
-            {themes.map((theme, index) => {
+          {!hideThemeCards && (
+            <div className="lg:col-span-8 lg:order-1 grid grid-cols-1 md:grid-cols-2 gap-4">
+              {themes.map((theme, index) => {
               const persistence = getPersistenceLabel(theme.metadata?.monthsActive);
               const status = getStatusBadge(theme.metadata?.status, theme.type);
               
@@ -296,9 +306,11 @@ export function ScoreDriversThemes({
                       </span>
                       
                       {/* Status badge */}
-                      <span className={`text-xs px-2 py-1 rounded font-medium ${status.bgColor} ${status.color}`}>
-                        {status.label}
-                      </span>
+                      {status && (
+                        <span className={`text-xs px-2 py-1 rounded font-medium ${status.bgColor} ${status.color}`}>
+                          {status.label}
+                        </span>
+                      )}
                       
                       {/* Persistence badge */}
                       {theme.metadata?.monthsActive !== undefined && theme.metadata?.monthsActive > 0 && (
@@ -326,15 +338,27 @@ export function ScoreDriversThemes({
                   </div>
 
                   {/* Context Metadata */}
-                  <div className="pt-2 border-t border-slate-100 space-y-1 text-xs text-slate-600">
-                    <div><strong>Percentage:</strong> {theme.percentage}% of feedback</div>
-                    {theme.metadata?.monthsActive !== undefined && theme.metadata.monthsActive > 0 && (
-                      <div><strong>Active:</strong> {theme.metadata.monthsActive} month{theme.metadata.monthsActive !== 1 ? 's' : ''}</div>
-                    )}
-                    {theme.metadata?.crossAppCount && theme.metadata.crossAppCount > 1 && (
-                      <div><strong>Cross-App:</strong> {theme.metadata.crossAppCount} apps affected</div>
-                    )}
-                  </div>
+                  {(() => {
+                    const hasPercentage = theme.percentage !== null;
+                    const hasActiveMonths = theme.metadata?.monthsActive !== undefined && theme.metadata.monthsActive > 0;
+                    const hasCrossApp = (theme.metadata?.crossAppCount ?? 0) > 1;
+                    if (!hasPercentage && !hasActiveMonths && !hasCrossApp) return null;
+                    return (
+                      <div className="pt-2 border-t border-slate-100 space-y-1 text-xs text-slate-600">
+                        {hasPercentage && (
+                          <div><strong>Percentage:</strong> {theme.percentage}% of feedback</div>
+                        )}
+                        {hasActiveMonths && (
+                          <div>
+                            <strong>Active:</strong> {theme.metadata?.monthsActive} month{theme.metadata?.monthsActive !== 1 ? 's' : ''}
+                          </div>
+                        )}
+                        {hasCrossApp && (
+                          <div><strong>Cross-App:</strong> {theme.metadata?.crossAppCount} apps affected</div>
+                        )}
+                      </div>
+                    );
+                  })()}
 
                   {/* Summary Points */}
                   {theme.narratives && theme.narratives.length > 0 && (
@@ -365,9 +389,10 @@ export function ScoreDriversThemes({
                     </div>
                   )}
                 </Card>
-              );
-            })}
-          </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       </div>
     );
