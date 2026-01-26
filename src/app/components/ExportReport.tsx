@@ -961,7 +961,9 @@ function AppDetailPage({
         {/* Right - Feedback Themes (55% of remaining width) */}
         <div className="w-[55%] px-8 py-6 border-l border-gray-200">
           <div className="mb-6">
-            <h3 className="text-xl font-bold tracking-wide text-center mb-1">DECEMBER FEEDBACK THEMES</h3>
+            <h3 className="text-xl font-bold tracking-wide text-center mb-1">
+              {selectedMonth.toUpperCase()} FEEDBACK THEMES
+            </h3>
             <p className="text-xs text-gray-500 text-center">
               AI Supported Summary
               {(app.isKTLO || app.noUX) && (
@@ -1943,7 +1945,7 @@ export function ExportReport({
                           )}
                           {!metricsError && isMetricsLoading && exportApps.length === 0 && (
                             <div className="mb-2 rounded border border-gray-200 bg-gray-50 px-2 py-1 text-xs text-gray-600">
-                              Loading apps from Supabase…
+                              Loading apps from database…
                             </div>
                           )}
                           {!metricsError && !isMetricsLoading && exportApps.length === 0 && (

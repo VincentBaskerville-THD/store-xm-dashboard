@@ -1059,15 +1059,38 @@ export function ManageTopPains({
                     </div>
 
                     <div className="flex items-center gap-1 ml-4">
-                      {!isExpanded && (
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => startEditing(group)}
-                          className="h-7 w-7 p-0 text-slate-500 hover:text-slate-700"
-                        >
-                          <Edit2 className="size-3.5" />
-                        </Button>
+                      {isEditing && !isExpanded ? (
+                        <>
+                          <Button
+                            size="sm"
+                            onClick={saveTheme}
+                            disabled={isSaving}
+                            className="h-7 px-2 text-xs"
+                            style={{ backgroundColor: '#ff6900', color: 'white' }}
+                          >
+                            <Save className="size-3 mr-1" />
+                            Save
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={cancelEditing}
+                            className="h-7 w-7 p-0 text-slate-500 hover:text-slate-700"
+                          >
+                            <X className="size-3.5" />
+                          </Button>
+                        </>
+                      ) : (
+                        !isExpanded && (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => startEditing(group)}
+                            className="h-7 w-7 p-0 text-slate-500 hover:text-slate-700"
+                          >
+                            <Edit2 className="size-3.5" />
+                          </Button>
+                        )
                       )}
                       <Button
                         size="sm"
