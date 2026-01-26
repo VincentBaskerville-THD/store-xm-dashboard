@@ -67,6 +67,8 @@ export function PortfolioOverview({
   const [filter, setFilter] = useState<FilterType>('all');
   const [appMetrics, setAppMetrics] = useState<AppData[] | null>(null);
   const [metricsPeriodLabel, setMetricsPeriodLabel] = useState<string | null>(null);
+  const [previousPeriodLabel, setPreviousPeriodLabel] = useState<string | null>(null);
+  const [previousMetricsByApp, setPreviousMetricsByApp] = useState<Record<string, AppMetricsRow>>({});
   const [metricsError, setMetricsError] = useState<string | null>(null);
   const [periodsError, setPeriodsError] = useState<string | null>(null);
   const [isMetricsLoading, setIsMetricsLoading] = useState(false);
@@ -215,7 +217,7 @@ export function PortfolioOverview({
         if (selectedPeriodCode) {
           queryQueue.push({ field: 'period', value: selectedPeriodCode });
         }
-      } else {
+        } else {
         if (selectedPeriodCode) {
           queryQueue.push({ field: 'period', value: selectedPeriodCode });
         }
@@ -245,12 +247,41 @@ export function PortfolioOverview({
         setMetricsError(error.message);
         setAppMetrics(null);
         setMetricsPeriodLabel(null);
+        setPreviousPeriodLabel(null);
+        setPreviousMetricsByApp({});
         setLastUpdatedAt(null);
         setIsMetricsLoading(false);
         return;
       }
 
       const rows = (data ?? []) as AppMetricsRow[];
+      // Also load the immediately previous period so we can compute driver deltas (Ease vs Usefulness).
+      const selectedSortOrder = rows[0]?.sort_order;
+      let previousPeriodCode: string | null = null;
+      let previousLabel: string | null = null;
+      let previousRows: AppMetricsRow[] = [];
+
+      if (selectedSortOrder !== undefined) {
+        const { data: prevPeriodRows, error: prevPeriodError } = await supabase
+          .from(viewName)
+          .select('period, period_label, sort_order')
+          .lt('sort_order', selectedSortOrder)
+          .order('sort_order', { ascending: false })
+          .limit(1);
+
+        if (!prevPeriodError && prevPeriodRows && prevPeriodRows.length > 0) {
+          const prevPeriod = prevPeriodRows[0];
+          previousPeriodCode = prevPeriod.period ?? null;
+          previousLabel = prevPeriod.period_label ?? prevPeriod.period ?? null;
+
+          if (previousPeriodCode) {
+            const prevResult = await buildQuery('period', previousPeriodCode);
+            if (!prevResult.error && prevResult.data) {
+              previousRows = prevResult.data as AppMetricsRow[];
+            }
+          }
+        }
+      }
       // Use the most recent created_at in the period as the "Last updated" timestamp.
       const latestCreatedAt = rows.reduce<string | null>((latest, row) => {
         if (!row.created_at) return latest;
@@ -267,8 +298,8 @@ export function PortfolioOverview({
               : row.mom_pct_change) ?? 0
         );
         const trend: AppData['trend'] = changeValue > 0 ? 'up' : changeValue < 0 ? 'down' : 'stable';
-
-        return {
+      
+      return {
           id: row.app_id,
           name: row.app_name ?? row.app_id ?? 'Unknown',
           overallScore: row.overall_score ?? 0,
@@ -278,11 +309,18 @@ export function PortfolioOverview({
           responses: row.response_count ?? 0,
           trend,
           metricsSystem: normalizeMetricsSystem(row.resolved_metrics_system ?? null),
-        };
-      });
+      };
+    });
 
       setAppMetrics(mappedApps.length ? mappedApps : null);
       setMetricsPeriodLabel(rows[0]?.period_label ?? timePeriod.period);
+      setPreviousPeriodLabel(previousLabel);
+      setPreviousMetricsByApp(
+        previousRows.reduce((acc, row) => {
+          acc[row.app_id] = row;
+          return acc;
+        }, {} as Record<string, AppMetricsRow>)
+      );
       setLastUpdatedAt(latestCreatedAt);
       setIsMetricsLoading(false);
     };
@@ -314,16 +352,36 @@ export function PortfolioOverview({
   const avgUsefulnessValue = hasApps
     ? periodApps.reduce((sum, app) => sum + app.usefulness, 0) / periodApps.length
     : null;
-  const mostImprovedDriver =
-    avgEaseOfUseValue !== null && avgUsefulnessValue !== null
-      ? avgEaseOfUseValue >= avgUsefulnessValue
-        ? 'Ease of Use'
-        : 'Usefulness'
-      : null;
-  const driverDelta =
-    avgEaseOfUseValue !== null && avgUsefulnessValue !== null
-      ? Math.abs(avgEaseOfUseValue - avgUsefulnessValue)
-      : null;
+  // "Most Improved Driver" = biggest positive driver delta (current - previous) across all apps.
+  const mostImprovedDriverApp = hasApps
+    ? periodApps.reduce<null | { app: AppData; driver: 'Ease of Use' | 'Usefulness'; delta: number }>((best, app) => {
+        const previous = previousMetricsByApp[app.id];
+        if (!previous) return best;
+        const easePrev = previous.ease_of_use_avg;
+        const usefulnessPrev = previous.usefulness_avg;
+        const easeDelta = easePrev === null || easePrev === undefined ? null : app.easeOfUse - easePrev;
+        const usefulnessDelta =
+          usefulnessPrev === null || usefulnessPrev === undefined ? null : app.usefulness - usefulnessPrev;
+        const candidate =
+          easeDelta === null && usefulnessDelta === null
+            ? null
+            : usefulnessDelta === null || (easeDelta !== null && easeDelta >= usefulnessDelta)
+              ? { driver: 'Ease of Use' as const, delta: easeDelta ?? 0 }
+              : { driver: 'Usefulness' as const, delta: usefulnessDelta };
+
+        if (!candidate || candidate.delta <= 0) return best;
+        if (!best || candidate.delta > best.delta) {
+          return { app, driver: candidate.driver, delta: candidate.delta };
+        }
+        if (candidate.delta === best.delta) {
+          return app.overallScore > best.app.overallScore ? { app, driver: candidate.driver, delta: candidate.delta } : best;
+        }
+        return best;
+      }, null)
+    : null;
+  const mostImprovedDriver = mostImprovedDriverApp ? mostImprovedDriverApp.driver : null;
+  const driverDelta = mostImprovedDriverApp ? mostImprovedDriverApp.delta : null;
+  const driverDeltaPercent = driverDelta !== null ? Math.round((driverDelta / 5) * 100) : null;
 
   const getPercentage = (count: number) =>
     totalApps > 0 ? Math.round((count / totalApps) * 100) : 0;
@@ -518,9 +576,13 @@ export function PortfolioOverview({
                     <span className="text-blue-900 text-xs font-medium">Most Improved Driver</span>
                   </div>
                   <div className="text-right">
-                    <div className="font-semibold text-slate-900 text-sm">{mostImprovedDriver ?? '--'}</div>
+                    <div className="font-semibold text-slate-900 text-sm">
+                      {mostImprovedDriverApp?.app.name ?? '--'}
+                    </div>
                     <div className="text-blue-700 text-sm font-semibold">
-                      {driverDelta !== null ? `+${driverDelta.toFixed(1)}` : '--'}
+                      {mostImprovedDriver && driverDeltaPercent !== null
+                        ? `${mostImprovedDriver} +${driverDeltaPercent}%`
+                        : '--'}
                     </div>
                   </div>
                 </div>
@@ -646,14 +708,14 @@ export function PortfolioOverview({
                     </tr>
                   ))}
                   {hasTableApps && (
-                    <tr className="bg-slate-100 font-semibold">
-                      <td className="px-6 py-4 text-slate-900">Portfolio Average</td>
+                  <tr className="bg-slate-100 font-semibold">
+                    <td className="px-6 py-4 text-slate-900">Portfolio Average</td>
                       <td className="px-6 py-4 text-center text-slate-900">{tablePortfolioScore}</td>
-                      <td className="px-6 py-4 text-center text-slate-900">--</td>
-                      <td className="px-6 py-4 text-center text-slate-900">{avgEaseOfUse}</td>
-                      <td className="px-6 py-4 text-center text-slate-900">{avgUsefulness}</td>
-                      <td className="px-6 py-4 text-center text-slate-900">{totalResponses.toLocaleString()}</td>
-                    </tr>
+                    <td className="px-6 py-4 text-center text-slate-900">--</td>
+                    <td className="px-6 py-4 text-center text-slate-900">{avgEaseOfUse}</td>
+                    <td className="px-6 py-4 text-center text-slate-900">{avgUsefulness}</td>
+                    <td className="px-6 py-4 text-center text-slate-900">{totalResponses.toLocaleString()}</td>
+                  </tr>
                   )}
                 </tbody>
               </table>
