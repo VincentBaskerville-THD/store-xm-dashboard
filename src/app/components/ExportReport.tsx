@@ -1141,6 +1141,7 @@ export function ExportReport({
   useEffect(() => {
     let isMounted = true;
     const loadAvailableMonths = async () => {
+      // Load once to avoid re-fetching the entire history on every month change.
       const { data, error } = await supabase
         .from('v_app_metrics_trends')
         .select('period, period_label, sort_order')
@@ -1177,6 +1178,13 @@ export function ExportReport({
 
     loadAvailableMonths();
 
+    return () => {
+      isMounted = false;
+    };
+  }, [hasInitializedMonth]);
+
+  useEffect(() => {
+    let isMounted = true;
     const loadExportApps = async () => {
       setIsMetricsLoading(true);
       setMetricsError(null);
@@ -1294,7 +1302,6 @@ export function ExportReport({
     config.scoresConfig.selectedMonth,
     config.scoresConfig.timePeriod,
     hasCustomAppSelection,
-    hasInitializedMonth,
     monthLabelToCode,
   ]);
 
@@ -1580,21 +1587,24 @@ export function ExportReport({
     };
   }, [config.scoresConfig.selectedApps, config.scoresConfig.selectedMonth, monthLabelToCode]);
 
-  // Get current month/year for display
+  // Get current month/year for display (used as a safe fallback).
   const currentDate = new Date();
   const monthName = currentDate.toLocaleString('default', { month: 'long' });
   const shortMonthName = currentDate.toLocaleString('default', { month: 'short' });
   const year = currentDate.getFullYear();
   const formattedDate = `${currentDate.getMonth() + 1}/${currentDate.getDate()}/${year}`;
   const currentMonthLabel = `${monthName} ${year}`;
-  const reportPeriodLabel = metricsPeriodLabel ?? `${monthName} ${year}`;
+  const selectedMonthLabel = config.scoresConfig.selectedMonth ?? null;
+  // Use the selected month first so the title updates instantly on change.
+  const reportPeriodLabel = selectedMonthLabel ?? metricsPeriodLabel ?? currentMonthLabel;
   const reportPeriodShortLabel = (() => {
-    if (!metricsPeriodLabel) return `${shortMonthName} '${year.toString().slice(2)}`;
-    const parts = metricsPeriodLabel.split(' ');
+    const label = selectedMonthLabel ?? metricsPeriodLabel;
+    if (!label) return `${shortMonthName} '${year.toString().slice(2)}`;
+    const parts = label.split(' ');
     if (parts.length >= 2 && /^\d{4}$/.test(parts[1])) {
       return `${parts[0].slice(0, 3)} '${parts[1].slice(2)}`;
     }
-    return metricsPeriodLabel;
+    return label;
   })();
 
   // Calculate stats for preview
