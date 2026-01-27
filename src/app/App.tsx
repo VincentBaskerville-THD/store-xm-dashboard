@@ -81,7 +81,6 @@ interface NavigationState {
 
 interface FeatureFlags {
   keyJourneysEnabled: boolean;
-  topPainsEnabled: boolean;
 }
 
 interface AppSettings {
@@ -91,7 +90,6 @@ interface AppSettings {
   dashboardAuthEnabled: boolean;
   dashboardPassword: string;
   keyJourneysEnabled: boolean;
-  topPainsEnabled: boolean;
 }
 
 function App() {
@@ -120,21 +118,19 @@ function App() {
   });
   const [globalFeatureFlags, setGlobalFeatureFlags] = useState<FeatureFlags>({
     keyJourneysEnabled: false,
-    topPainsEnabled: false,
   });
   const [localFeatureFlags, setLocalFeatureFlags] = useState<FeatureFlags>(() => {
     const stored = localStorage.getItem('featureFlagsLocal');
     if (!stored) {
-      return { keyJourneysEnabled: false, topPainsEnabled: false };
+      return { keyJourneysEnabled: false };
     }
     try {
       const parsed = JSON.parse(stored) as Partial<FeatureFlags>;
       return {
         keyJourneysEnabled: Boolean(parsed.keyJourneysEnabled),
-        topPainsEnabled: Boolean(parsed.topPainsEnabled),
       };
     } catch {
-      return { keyJourneysEnabled: false, topPainsEnabled: false };
+      return { keyJourneysEnabled: false };
     }
   });
   const [useLocalFeatureFlags, setUseLocalFeatureFlags] = useState(() => {
@@ -155,7 +151,7 @@ function App() {
     const loadSettings = async () => {
       const { data, error } = await supabase
         .from('app_settings')
-        .select('id,admin_auth_enabled,admin_show_button,admin_password,dashboard_auth_enabled,dashboard_password,key_journeys_enabled,top_pains_enabled')
+        .select('id,admin_auth_enabled,admin_show_button,admin_password,dashboard_auth_enabled,dashboard_password,key_journeys_enabled')
         .eq('id', 'global')
         .maybeSingle();
 
@@ -179,7 +175,6 @@ function App() {
         dashboardAuthEnabled: data.dashboard_auth_enabled ?? dashboardAuthEnabled,
         dashboardPassword: data.dashboard_password ?? dashboardPassword,
         keyJourneysEnabled: data.key_journeys_enabled ?? globalFeatureFlags.keyJourneysEnabled,
-        topPainsEnabled: data.top_pains_enabled ?? globalFeatureFlags.topPainsEnabled,
       };
 
       localStorage.setItem('adminAuthEnabled', String(nextSettings.adminAuthEnabled));
@@ -195,7 +190,6 @@ function App() {
       setDashboardPassword(nextSettings.dashboardPassword);
       setGlobalFeatureFlags({
         keyJourneysEnabled: nextSettings.keyJourneysEnabled,
-        topPainsEnabled: nextSettings.topPainsEnabled,
       });
       setSettingsLoaded(true);
     };
@@ -219,7 +213,6 @@ function App() {
           dashboard_auth_enabled: dashboardAuthEnabled,
           dashboard_password: dashboardPassword,
           key_journeys_enabled: globalFeatureFlags.keyJourneysEnabled,
-          top_pains_enabled: globalFeatureFlags.topPainsEnabled,
         });
 
       if (error) {
@@ -235,7 +228,6 @@ function App() {
     dashboardAuthEnabled,
     dashboardPassword,
     globalFeatureFlags.keyJourneysEnabled,
-    globalFeatureFlags.topPainsEnabled,
     settingsLoaded,
   ]);
 
@@ -716,7 +708,6 @@ function App() {
           onNavigateTopPainDetail={navigateToTopPainDetail}
           onNavigateAdmin={navigateToAdminThemes}
           onNavigateExport={navigateToExport}
-          isFeatureEnabled={effectiveFeatureFlags.topPainsEnabled}
           showAdminButton={adminShowButton}
         />
       )}

@@ -9,7 +9,6 @@ import { AdminTabNav } from './AdminTabNav';
 
 interface FeatureFlags {
   keyJourneysEnabled: boolean;
-  topPainsEnabled: boolean;
 }
 
 interface ManageFeatureFlagsProps {
@@ -110,17 +109,6 @@ export function ManageFeatureFlags({
               <Switch
                 checked={flags.keyJourneysEnabled}
                 onCheckedChange={(checked) => onFlagsChange({ ...flags, keyJourneysEnabled: checked })}
-              />
-            </div>
-
-            <div className="flex items-center justify-between rounded-lg border border-slate-200 p-4">
-              <div>
-                <p className="font-medium text-slate-900">Top Pains content</p>
-                <p className="text-sm text-slate-600">Show the full Top Pains page instead of Coming Soon.</p>
-              </div>
-              <Switch
-                checked={flags.topPainsEnabled}
-                onCheckedChange={(checked) => onFlagsChange({ ...flags, topPainsEnabled: checked })}
               />
             </div>
           </div>

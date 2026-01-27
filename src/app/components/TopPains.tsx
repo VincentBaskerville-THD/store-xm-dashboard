@@ -1,7 +1,7 @@
 // Top pains dashboard: aggregates feedback themes into prioritized pain points.
 // Mixes live Supabase data (when available) with a mock fallback dataset.
 import React, { useEffect, useMemo, useState } from 'react';
-import { AlertTriangle, TrendingUp, TrendingDown, AlertCircle, Info, Link2, Clock, BarChart3, LineChart, Construction, ChevronRight } from 'lucide-react';
+import { AlertTriangle, TrendingUp, TrendingDown, AlertCircle, Info, Link2, Clock, BarChart3, LineChart, ChevronRight } from 'lucide-react';
 import { Button } from './ui/button';
 import { Card } from './ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
@@ -22,7 +22,6 @@ interface TopPainsProps {
   onNavigateTopPainDetail?: (painId: string, scopeLabel?: string, defaultAppName?: string) => void;
   onNavigateAdmin?: () => void;
   onNavigateExport?: () => void;
-  isFeatureEnabled?: boolean;
   showAdminButton?: boolean;
 }
 
@@ -93,38 +92,8 @@ export function TopPains({
   onNavigateTopPainDetail,
   onNavigateAdmin,
   onNavigateExport,
-  isFeatureEnabled = true,
   showAdminButton,
 }: TopPainsProps) {
-  if (!isFeatureEnabled) {
-    return (
-      <div className="min-h-screen bg-white">
-        <NavigationHeader
-          currentView="top-pains"
-          onNavigateHome={onNavigateHome || onNavigateBack}
-          onNavigateAllApps={onNavigateAllApps || onNavigateBack}
-          onNavigateKeyJourneys={onNavigateKeyJourneys || onNavigateBack}
-          onNavigateTopPains={onNavigateTopPains || (() => {})}
-          onNavigateAdmin={onNavigateAdmin}
-          onNavigateExport={onNavigateExport}
-          showAdminButton={showAdminButton}
-          title="Top Pains"
-          subtitle="Emerging experience issues across the portfolio"
-          showExportButton={true}
-        />
-        <div className="mx-auto max-w-4xl px-4 sm:px-6 lg:px-8 py-10">
-          <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-10 text-center">
-            <Construction className="mx-auto size-12 text-orange-500" />
-            <h2 className="mt-4 text-xl font-semibold text-slate-900">Work in progress</h2>
-            <p className="mt-2 text-slate-600">
-              This functionality is coming soon. Check back in a few days &amp;/or give Vincent a ping.
-            </p>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   const [scopeFilter, setScopeFilter] = useState<string>('all');
   const [visualizationView, setVisualizationView] = useState<'both' | 'ranking' | 'trends'>('both');
   const [currentPage, setCurrentPage] = useState(1);
